@@ -1,0 +1,225 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+  Electromecánica JR - Industrial Theme
+  Paleta: Grafito (#121212), Azul Eléctrico (#0066FF), Acentos (#333333)
+*/
+
+@layer base {
+  :root {
+    /* Industrial Dark Theme - Grafito oscuro */
+    --background: 0 0% 7.1%;
+    /* #121212 */
+    --foreground: 210 40% 98%;
+
+    --card: 0 0% 9%;
+    /* #171717 */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Azul Eléctrico del Logo JR */
+    --primary: 213 100% 50%;
+    /* #0066FF */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 14%;
+    /* #242424 */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 0 0% 14%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Bordes sutiles para inputs */
+    --border: 0 0% 20%;
+    /* #333333 */
+    --input: 0 0% 20%;
+    --ring: 213 100% 50%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #121212;
+  }
+
+  /* Touch targets generosos - Fat finger friendly */
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Fat-finger friendly touch targets */
+@layer utilities {
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background;
+  }
+}
+
+/* Safe area padding for iOS */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Animations */
+@keyframes slide-in-from-top {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-in {
+  animation-duration: 0.3s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+
+.slide-in-from-top {
+  animation-name: slide-in-from-top;
+}
+
+.slide-in-from-bottom {
+  animation-name: slide-in-from-bottom;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-container {
+    padding: 20px;
+    max-width: 100%;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+
+  /* Fat-finger friendly buttons */
+  button,
+  a[role="button"],
+  input[type="submit"] {
+    min-height: 48px;
+  }
+
+  html {
+    font-size: 16px;
+  }
+
+  /* Disable zoom on input focus (iOS) */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Industrial input styles - bordes visibles */
+input,
+textarea,
+select {
+  border-color: #333333 !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  @apply ring-2 ring-primary/50 ring-offset-2 ring-offset-background outline-none;
+  border-color: #0066FF !important;
+}
+
+/* Scrollbar industrial */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #121212;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
+}

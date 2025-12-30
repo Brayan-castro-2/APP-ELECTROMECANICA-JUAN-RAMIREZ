@@ -197,8 +197,6 @@ export async function crearOrden(orden: {
     creado_por: string;
     estado?: string;
     fotos?: string[];
-    cliente_nombre?: string;
-    cliente_telefono?: string;
 }): Promise<OrdenDB | null> {
     const { data, error } = await supabase
         .from('ordenes')
@@ -208,8 +206,6 @@ export async function crearOrden(orden: {
             creado_por: orden.creado_por,
             estado: orden.estado || 'pendiente',
             fotos: orden.fotos || [],
-            cliente_nombre: orden.cliente_nombre,
-            cliente_telefono: orden.cliente_telefono,
         }])
         .select()
         .single();

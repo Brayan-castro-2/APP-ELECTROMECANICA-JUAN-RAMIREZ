@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { obtenerPerfiles, actualizarPerfil, crearUsuario, PerfilDB } from '@/lib/local-storage-service';
+import { obtenerPerfiles, actualizarPerfil, crearUsuario, type PerfilDB } from '@/lib/storage-adapter';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

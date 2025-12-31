@@ -55,60 +55,6 @@ export async function obtenerVehiculos(): Promise<VehiculoDB[]> {
     return data || [];
 }
 
-// Actualizar perfil de usuario
-export async function actualizarPerfil(
-    id: string,
-    updates: Partial<Omit<PerfilDB, 'id'>>
-): Promise<PerfilDB | null> {
-    const { data, error } = await supabase
-        .from('perfiles')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error al actualizar perfil:', error);
-        return null;
-    }
-
-    return data;
-}
-
-// Crear nuevo usuario (solo admin)
-export async function crearUsuario(
-    email: string,
-    password: string,
-    nombreCompleto: string,
-    rol: 'admin' | 'mecanico'
-): Promise<{ success: boolean; error?: string }> {
-    // Crear usuario en auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-    });
-
-    if (authError || !authData.user) {
-        return { success: false, error: authError?.message || 'Error al crear usuario' };
-    }
-
-    // Crear perfil
-    const { error: perfilError } = await supabase
-        .from('perfiles')
-        .insert([{
-            id: authData.user.id,
-            nombre_completo: nombreCompleto,
-            rol,
-            activo: true,
-        }]);
-
-    if (perfilError) {
-        return { success: false, error: perfilError.message };
-    }
-
-    return { success: true };
-}
-
 // ============ ALMACENAMIENTO ============
 
 // Subir imagen al bucket
@@ -394,4 +340,78 @@ export async function obtenerSesionActual(): Promise<{
         user: { id: session.user.id, email: session.user.email! },
         perfil,
     };
+}
+
+// Crear nuevo usuario
+export async function crearUsuario(
+    email: string,
+    password: string,
+    nombreCompleto: string,
+    rol: 'admin' | 'mecanico'
+): Promise<{ success: boolean; error?: string; user?: PerfilDB }> {
+    try {
+        // 1. Crear usuario en Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                emailRedirectTo: undefined,
+                data: {
+                    nombre_completo: nombreCompleto,
+                    rol: rol,
+                }
+            }
+        });
+
+        if (authError || !authData.user) {
+            console.error('Error al crear usuario en Auth:', authError);
+            return { success: false, error: authError?.message || 'Error al crear usuario' };
+        }
+
+        // 2. Crear perfil en la tabla perfiles
+        const { data: perfilData, error: perfilError } = await supabase
+            .from('perfiles')
+            .insert([{
+                id: authData.user.id,
+                email: email,
+                nombre_completo: nombreCompleto,
+                rol: rol,
+                activo: true,
+            }])
+            .select()
+            .single();
+
+        if (perfilError) {
+            console.error('Error al crear perfil:', perfilError);
+            // Intentar eliminar el usuario de Auth si falla la creación del perfil
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            return { success: false, error: 'Error al crear perfil de usuario' };
+        }
+
+        console.log('✅ Usuario creado exitosamente:', perfilData);
+        return { success: true, user: perfilData };
+    } catch (error) {
+        console.error('Error inesperado al crear usuario:', error);
+        return { success: false, error: 'Error inesperado al crear usuario' };
+    }
+}
+
+// Actualizar perfil
+export async function actualizarPerfil(
+    id: string,
+    updates: Partial<Omit<PerfilDB, 'id'>>
+): Promise<PerfilDB | null> {
+    const { data, error } = await supabase
+        .from('perfiles')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error al actualizar perfil:', error);
+        return null;
+    }
+
+    return data;
 }

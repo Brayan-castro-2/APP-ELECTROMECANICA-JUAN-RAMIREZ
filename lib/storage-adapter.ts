@@ -127,6 +127,18 @@ export async function actualizarPerfil(
     return localService.actualizarPerfil(id, updates);
 }
 
+export async function crearUsuario(
+    email: string,
+    password: string,
+    nombreCompleto: string,
+    rol: 'admin' | 'mecanico'
+): Promise<{ success: boolean; error?: string; user?: PerfilDB }> {
+    if (isSupabase()) {
+        return supabaseService.crearUsuario(email, password, nombreCompleto, rol);
+    }
+    return localService.crearUsuario(email, password, nombreCompleto, rol);
+}
+
 // ============ INICIALIZACIÓN ============
 
 export function inicializarLocalStorage(): void {

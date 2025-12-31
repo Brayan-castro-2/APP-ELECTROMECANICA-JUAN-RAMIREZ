@@ -40,6 +40,8 @@ CREATE TABLE ordenes (
     
     fecha_ingreso TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    fecha_lista TIMESTAMP WITH TIME ZONE,
+    fecha_completada TIMESTAMP WITH TIME ZONE,
     
     fotos TEXT[],
     cliente_nombre TEXT,

@@ -267,6 +267,8 @@ export async function actualizarOrden(
     id: number,
     updates: Partial<Omit<OrdenDB, 'id' | 'fecha_ingreso'>>
 ): Promise<OrdenDB | null> {
+    console.log(`🔵 Actualizando orden ${id} en Supabase:`, updates);
+    
     const { data, error } = await supabase
         .from('ordenes')
         .update({
@@ -278,10 +280,11 @@ export async function actualizarOrden(
         .single();
 
     if (error) {
-        console.error('Error al actualizar orden:', error);
+        console.error('❌ Error al actualizar orden:', error);
         return null;
     }
 
+    console.log('✅ Orden actualizada en Supabase:', data);
     return data;
 }
 

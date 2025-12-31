@@ -210,9 +210,13 @@ export default function OrdenesCleanPage() {
             fecha_completada: now,
         });
         if (updated) {
+            console.log('✅ Orden actualizada:', updated);
             setOrder(updated);
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2500);
+        } else {
+            console.error('❌ Error: No se pudo actualizar la orden');
+            alert('Error al actualizar el estado. Por favor intenta de nuevo.');
         }
         setIsSaving(false);
     };

@@ -252,6 +252,8 @@ export async function obtenerPerfiles(): Promise<PerfilDB[]> {
 
 // Obtener perfil por ID
 export async function obtenerPerfilPorId(id: string): Promise<PerfilDB | null> {
+    console.log('🔍 Buscando perfil con ID:', id);
+    
     const { data, error } = await supabase
         .from('perfiles')
         .select('*')
@@ -259,10 +261,12 @@ export async function obtenerPerfilPorId(id: string): Promise<PerfilDB | null> {
         .single();
 
     if (error) {
-        console.error('Error al obtener perfil:', error);
+        console.error('❌ Error al obtener perfil:', error);
+        console.error('❌ ID buscado:', id);
         return null;
     }
 
+    console.log('✅ Perfil encontrado:', data);
     return data;
 }
 

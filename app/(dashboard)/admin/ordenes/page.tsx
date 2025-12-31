@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { obtenerOrdenes, obtenerPerfiles, obtenerVehiculos } from '@/lib/supabase-service';
-import { OrdenDB, PerfilDB, VehiculoDB } from '@/lib/supabase';
+import { obtenerOrdenes, obtenerPerfiles, obtenerVehiculos, type OrdenDB, type PerfilDB, type VehiculoDB } from '@/lib/storage-adapter';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -176,7 +176,7 @@ export default function OrdenesPage() {
                                                 {getStatusBadge(order.estado)}
                                             </TableCell>
                                             <TableCell>
-                                                <Link href={`/admin/ordenes/${order.id}`}>
+                                                <Link href={`/admin/ordenes/clean?id=${order.id}`}>
                                                     <Button size="sm" variant="ghost" className="text-slate-300 hover:text-white">
                                                         <ChevronRight className="w-4 h-4" />
                                                     </Button>
@@ -194,7 +194,7 @@ export default function OrdenesPage() {
                         {filteredOrders.map((order) => {
                             const vehiculo = getVehiculo(order.patente_vehiculo);
                             return (
-                                <Link key={order.id} href={`/admin/ordenes/${order.id}`}>
+                                <Link key={order.id} href={`/admin/ordenes/clean?id=${order.id}`}>
                                     <Card className="bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 transition-all">
                                         <CardContent className="p-4">
                                             <div className="flex items-center gap-3">

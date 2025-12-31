@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { obtenerPerfilPorId, obtenerOrdenesPorUsuario, actualizarPerfil } from '@/lib/supabase-service';
-import { PerfilDB, OrdenDB } from '@/lib/supabase';
+import { obtenerPerfilPorId, obtenerOrdenesPorUsuario, actualizarPerfil, PerfilDB, OrdenDB } from '@/lib/local-storage-service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -165,7 +164,7 @@ export default function UsuarioDetailPage() {
                             ) : (
                                 <div className="space-y-2">
                                     {ordenes.creadas.map((orden) => (
-                                        <Link key={orden.id} href={`/admin/ordenes/${orden.id}`}>
+                                        <Link key={orden.id} href={`/admin/ordenes/clean?id=${orden.id}`}>
                                             <div className="flex items-center gap-3 p-3 rounded-xl bg-[#121212] hover:bg-[#242424] transition-all">
                                                 <div className="w-12 h-9 bg-[#333333] rounded-lg flex items-center justify-center">
                                                     <span className="text-white font-mono text-xs font-bold">
@@ -200,7 +199,7 @@ export default function UsuarioDetailPage() {
                             ) : (
                                 <div className="space-y-2">
                                     {ordenes.asignadas.map((orden) => (
-                                        <Link key={orden.id} href={`/admin/ordenes/${orden.id}`}>
+                                        <Link key={orden.id} href={`/admin/ordenes/clean?id=${orden.id}`}>
                                             <div className="flex items-center gap-3 p-3 rounded-xl bg-[#121212] hover:bg-[#242424] transition-all">
                                                 <div className="w-12 h-9 bg-[#333333] rounded-lg flex items-center justify-center">
                                                     <span className="text-white font-mono text-xs font-bold">

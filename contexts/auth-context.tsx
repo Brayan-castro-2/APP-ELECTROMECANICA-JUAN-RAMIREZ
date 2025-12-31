@@ -1,8 +1,13 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase, PerfilDB } from '@/lib/supabase';
-import { loginConCredenciales, logout as logoutService, obtenerSesionActual } from '@/lib/supabase-service';
+import { 
+    loginConCredenciales, 
+    logout as logoutService, 
+    obtenerSesionActual,
+    initializeLocalStorage,
+    PerfilDB 
+} from '@/lib/local-storage-service';
 
 // Usuario del contexto
 export interface AuthUser {
@@ -26,71 +31,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Función para cargar perfil del usuario
-    const loadUserProfile = async (userId: string, email: string): Promise<AuthUser | null> => {
-        try {
-            const { data: perfil, error } = await supabase
-                .from('perfiles')
-                .select('*')
-                .eq('id', userId)
-                .maybeSingle(); // Usa maybeSingle para evitar error si no existe
-
-            if (error) {
-                console.error('Error cargando perfil:', error.message);
-                return null;
-            }
-
-            if (!perfil) {
-                console.log('Perfil no encontrado, creando perfil por defecto...');
-                // Si no existe perfil, crear uno por defecto como admin (solo para el primer usuario)
-                const { data: newPerfil, error: createError } = await supabase
-                    .from('perfiles')
-                    .insert({
-                        id: userId,
-                        nombre_completo: email.split('@')[0],
-                        rol: 'admin',
-                        activo: true
-                    })
-                    .select()
-                    .single();
-
-                if (createError) {
-                    console.error('Error creando perfil:', createError.message);
-                    return null;
-                }
-
-                return {
-                    id: userId,
-                    email: email,
-                    name: newPerfil.nombre_completo,
-                    role: newPerfil.rol,
-                    isActive: newPerfil.activo,
-                };
-            }
-
-            if (!perfil.activo) {
-                console.log('Usuario desactivado');
-                return null;
-            }
-
-            return {
-                id: userId,
-                email: email,
-                name: perfil.nombre_completo,
-                role: perfil.rol,
-                isActive: perfil.activo,
-            };
-        } catch (e) {
-            console.error('Excepción cargando perfil:', e);
-            return null;
-        }
-    };
-
     // Inicializar sesión al cargar
     useEffect(() => {
         const initSession = async () => {
             try {
-                // Usar servicio que maneja offline
+                // Inicializar localStorage con datos por defecto
+                initializeLocalStorage();
+                
+                // Obtener sesión guardada
                 const result = await obtenerSesionActual();
 
                 if (result.user && result.perfil) {
@@ -102,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         isActive: result.perfil.activo,
                     };
                     setUser(authUser);
+                    console.log('Sesión restaurada:', authUser.name);
                 }
             } catch (error) {
                 console.error('Error inicializando sesión:', error);
@@ -111,31 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         initSession();
-
-        // Escuchar cambios de auth
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth event:', event);
-
-            if (event === 'SIGNED_OUT') {
-                setUser(null);
-            } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-                const authUser = await loadUserProfile(session.user.id, session.user.email!);
-                if (authUser) {
-                    setUser(authUser);
-                }
-            }
-        });
-
-        return () => {
-            subscription.unsubscribe();
-        };
     }, []);
 
     const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
         try {
             console.log('Iniciando login para:', email);
 
-            // Usar el servicio que maneja modo offline automáticamente
+            // Usar el servicio de localStorage
             const result = await loginConCredenciales(email.trim(), password);
 
             if (result.error || !result.user || !result.perfil) {

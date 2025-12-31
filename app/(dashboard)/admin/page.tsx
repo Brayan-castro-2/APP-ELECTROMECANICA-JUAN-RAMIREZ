@@ -5,9 +5,11 @@ import {
     obtenerOrdenes,
     obtenerOrdenesHoy,
     obtenerPerfiles,
-    obtenerVehiculos
-} from '@/lib/supabase-service';
-import { OrdenDB, PerfilDB, VehiculoDB } from '@/lib/supabase';
+    obtenerVehiculos,
+    type OrdenDB, 
+    type PerfilDB, 
+    type VehiculoDB
+} from '@/lib/storage-adapter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -93,7 +95,7 @@ export default function AdminPage() {
     };
 
     const stats = useMemo(() => ({
-        today: todaysOrders.length,
+        todayRevenue: todaysOrders.reduce((acc, o) => acc + (o.precio_total || 0), 0),
         pending: allOrders.filter(o => o.estado === 'pendiente').length,
         inProgress: allOrders.filter(o => o.estado === 'en_progreso').length,
         completed: allOrders.filter(o => o.estado === 'completada').length,
@@ -154,7 +156,7 @@ export default function AdminPage() {
                                 <Car className="w-6 h-6 text-blue-200" />
                                 <TrendingUp className="w-4 h-4 text-blue-200" />
                             </div>
-                            <p className="text-3xl font-bold text-white">{stats.today}</p>
+                            <p className="text-3xl font-bold text-white">${stats.todayRevenue.toLocaleString('es-CL')}</p>
                             <p className="text-sm text-blue-200">Ingresos Hoy</p>
                         </CardContent>
                     </Card>
@@ -228,7 +230,7 @@ export default function AdminPage() {
                         {todaysOrders.slice(0, 5).map((order) => {
                             const vehiculo = getVehiculo(order.patente_vehiculo);
                             return (
-                                <Link key={order.id} href={`/admin/ordenes/${order.id}`} prefetch>
+                                <Link key={order.id} href={`/admin/ordenes/clean?id=${order.id}`} prefetch>
                                     <Card className="bg-[#1a1a1a] border-[#333333] hover:bg-[#242424] transition-colors duration-150 active:scale-[0.99]">
                                         <CardContent className="p-4">
                                             <div className="flex items-center gap-4">

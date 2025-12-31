@@ -1,518 +1,799 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { buscarVehiculoPorPatente, crearOrden, crearVehiculo } from '@/lib/supabase-service';
-import { getVehicleData } from '@/lib/patent-api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Car,
-    Search,
-    Camera,
-    CheckCircle2,
-    AlertCircle,
-    Loader2,
-    Sparkles
-} from 'lucide-react';
+import { buscarVehiculoPorPatente, crearVehiculo, crearOrden } from '@/lib/storage-adapter';
+import { subirImagen } from '@/lib/local-storage-service';
+import { consultarPatenteGetAPI, isGetAPIConfigured } from '@/lib/getapi-service';
 
-// Servicios disponibles según el formulario del cliente
-const SERVICIOS = [
-    { id: 'dpf_electronico', label: 'DPF ELECTRÓNICO', requiresValue: true },
-    { id: 'dpf_fisico', label: 'DPF FÍSICO', requiresValue: true },
-    { id: 'scaner', label: 'SCANER', requiresValue: true },
-    { id: 'km', label: 'KM', requiresValue: true, requiresKmData: true },
-    { id: 'adblue_off', label: 'ADBLUE OFF', requiresValue: true },
-    { id: 'otro', label: 'OTRO', requiresValue: true, requiresDescription: true },
+const MOCK_DB: Record<string, { marca: string; modelo: string; anio: string; motor: string }> = {
+    PROFE1: { marca: 'Nissan', modelo: 'V16', anio: '2010', motor: '1.6 Twin Cam' },
+    BBBB10: { marca: 'Toyota', modelo: 'Yaris', anio: '2018', motor: '1.5' },
+    TEST01: { marca: 'Chevrolet', modelo: 'Sail', anio: '2020', motor: '1.4' },
+};
+
+const SERVICIOS_FRECUENTES = [
+    'DPF Electrónico',
+    'DPF Físico',
+    'Scanner',
+    'AdBlue OFF',
+    'Regeneración',
 ];
 
+type Servicio = { descripcion: string; precio: string };
+type FocusTarget = { index: number; field: 'desc' | 'precio' } | null;
+
+function formatMilesConPunto(value: string) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function buildKmServiceDescripcion(kmActual: string, kmNuevo: string) {
+    const a = kmActual ? `${formatMilesConPunto(kmActual)} KM` : 'KM actual';
+    const n = kmNuevo ? `${formatMilesConPunto(kmNuevo)} KM` : 'KM nuevo';
+    return `KM: ${a} → ${n}`;
+}
+
+function normalizePatente(v: string) {
+    return String(v || '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 6);
+}
+
+function parsePrecio(v: string) {
+    const cleaned = String(v || '').replace(/[^0-9]/g, '');
+    return cleaned ? Number(cleaned) : 0;
+}
+
+function moneyCL(n: number) {
+    return (Number.isFinite(n) ? n : 0).toLocaleString('es-CL');
+}
+
+function nowCL() {
+    return new Date().toLocaleString('es-CL', {
+        weekday: 'long',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
+}
+
 export default function RecepcionPage() {
+    const router = useRouter();
     const { user } = useAuth();
 
-    // Datos del cliente
-    const [clienteNombre, setClienteNombre] = useState('');
-    const [clienteTelefono, setClienteTelefono] = useState('');
+    const [fechaHora, setFechaHora] = useState(nowCL());
 
-    // Estado del vehículo
+    const [mecanico, setMecanico] = useState('Técnico en Turno');
+
     const [patente, setPatente] = useState('');
     const [marca, setMarca] = useState('');
     const [modelo, setModelo] = useState('');
-    const [cc, setCC] = useState(''); // Cilindrada
     const [anio, setAnio] = useState('');
-
-    // Servicios seleccionados (checklist)
-    const [serviciosSeleccionados, setServiciosSeleccionados] = useState<Record<string, boolean>>({});
-    const [valoresServicios, setValoresServicios] = useState<Record<string, string>>({});
-    
-    // Campos condicionales
+    const [motor, setMotor] = useState('');
+    const [kmEnabled, setKmEnabled] = useState(false);
     const [kmActual, setKmActual] = useState('');
     const [kmNuevo, setKmNuevo] = useState('');
-    const [otroDescripcion, setOtroDescripcion] = useState('');
-    
-    // Detalles del vehículo al ingreso
-    const [detallesIngreso, setDetallesIngreso] = useState('');
-    
-    // Fotos
-    const [fotos, setFotos] = useState<File[]>([]);
+    const [kmServiceIndex, setKmServiceIndex] = useState<number | null>(null);
+    const [vehiculoLocked, setVehiculoLocked] = useState(true);
+    const [estadoBusqueda, setEstadoBusqueda] = useState('');
+    const [isBuscando, setIsBuscando] = useState(false);
 
-    // Estado de UI
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchStatus, setSearchStatus] = useState<'idle' | 'found' | 'not_found'>('idle');
+    const [clienteNombre, setClienteNombre] = useState('');
+    const [clienteWhatsapp, setClienteWhatsapp] = useState('');
+
+    const [detallesVehiculo, setDetallesVehiculo] = useState('');
+    const [fotos, setFotos] = useState<string[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const [servicios, setServicios] = useState<Servicio[]>([{ descripcion: '', precio: '' }]);
+    const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
+
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitSuccess, setSubmitSuccess] = useState(false);
-    const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+    const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const descRefs = useRef<Array<HTMLInputElement | null>>([]);
+    const precioRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-    const handlePatenteLookup = async () => {
-        if (!patente.trim()) return;
+    const total = useMemo(() => {
+        return servicios.reduce((acc, s) => acc + parsePrecio(s.precio), 0);
+    }, [servicios]);
 
-        setIsSearching(true);
-        setSearchStatus('idle');
+    useEffect(() => {
+        const id = window.setInterval(() => setFechaHora(nowCL()), 1000);
+        return () => window.clearInterval(id);
+    }, []);
+
+    useEffect(() => {
+        const raw = localStorage.getItem('usuario_actual');
+        if (!raw) return;
+        try {
+            const u = JSON.parse(raw);
+            setMecanico(u?.nombre_completo || u?.nombre || u?.email || 'Técnico en Turno');
+        } catch {
+            setMecanico(raw);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (user?.name) {
+            setMecanico(user.name);
+        }
+    }, [user?.name]);
+
+    useEffect(() => {
+        if (!focusTarget) return;
+        const { index, field } = focusTarget;
+        const el = field === 'precio' ? precioRefs.current[index] : descRefs.current[index];
+        if (el) {
+            el.focus();
+            if (field === 'precio') el.select();
+        }
+        setFocusTarget(null);
+    }, [focusTarget, servicios.length]);
+
+    const buscarPatente = async () => {
+        const p = normalizePatente(patente);
+        setPatente(p);
+
+        if (!p) {
+            setEstadoBusqueda('');
+            setMarca('');
+            setModelo('');
+            setAnio('');
+            setMotor('');
+            setVehiculoLocked(true);
+            return;
+        }
+
+        setIsBuscando(true);
+        setEstadoBusqueda('🔍 Buscando patente...');
 
         try {
-            // 1. Buscar en base de datos local
-            const vehiculo = await buscarVehiculoPorPatente(patente);
-
-            if (vehiculo) {
-                setMarca(vehiculo.marca || '');
-                setModelo(vehiculo.modelo || '');
-                setAnio(vehiculo.anio || '');
-                setSearchStatus('found');
-            } else {
-                // 2. Si no existe, buscar en API Externa
-                const apiData = await getVehicleData(patente);
-                
-                if (apiData) {
-                    setMarca(apiData.marca);
-                    setModelo(apiData.modelo);
-                    setAnio(apiData.anio);
-                    setSearchStatus('found');
-                } else {
-                    setSearchStatus('not_found');
-                }
+            // 1. Primero buscar en localStorage
+            console.log(`[Búsqueda] Paso 1: Buscando ${p} en localStorage...`);
+            const vehiculoLocal = await buscarVehiculoPorPatente(p);
+            if (vehiculoLocal) {
+                console.log(`[Búsqueda] ✅ Encontrado en localStorage:`, vehiculoLocal);
+                setMarca(vehiculoLocal.marca);
+                setModelo(vehiculoLocal.modelo);
+                setAnio(vehiculoLocal.anio);
+                setMotor(vehiculoLocal.motor || '');
+                setVehiculoLocked(false);
+                setEstadoBusqueda(`✅ Vehículo encontrado en registros: ${vehiculoLocal.marca} ${vehiculoLocal.modelo} (${vehiculoLocal.anio})`);
+                setIsBuscando(false);
+                return;
             }
-        } catch {
-            setSearchStatus('not_found');
-        } finally {
-            setIsSearching(false);
-        }
-    };
+            console.log(`[Búsqueda] ❌ No encontrado en localStorage`);
 
-    const handleServicioToggle = (servicioId: string, checked: boolean) => {
-        setServiciosSeleccionados(prev => ({
-            ...prev,
-            [servicioId]: checked
-        }));
-        
-        // Limpiar valores si se desmarca
-        if (!checked) {
-            setValoresServicios(prev => {
-                const newValues = { ...prev };
-                delete newValues[servicioId];
-                return newValues;
-            });
+            // 2. Si no está en localStorage, consultar GetAPI
+            console.log(`[Búsqueda] Paso 2: Verificando configuración de GetAPI...`);
+            const apiConfigured = isGetAPIConfigured();
+            console.log(`[Búsqueda] GetAPI configurada: ${apiConfigured}`);
             
-            if (servicioId === 'km') {
-                setKmActual('');
-                setKmNuevo('');
+            if (apiConfigured) {
+                try {
+                    console.log(`[Búsqueda] Consultando GetAPI para patente ${p}...`);
+                    const vehiculoAPI = await consultarPatenteGetAPI(p);
+                    if (vehiculoAPI) {
+                        console.log(`[Búsqueda] ✅ Encontrado en GetAPI:`, vehiculoAPI);
+                        setMarca(vehiculoAPI.marca);
+                        setModelo(vehiculoAPI.modelo);
+                        setAnio(vehiculoAPI.anio);
+                        setMotor(vehiculoAPI.motor || '');
+                        setVehiculoLocked(false);
+                        setEstadoBusqueda(`✅ Vehículo encontrado en GetAPI: ${vehiculoAPI.marca} ${vehiculoAPI.modelo} (${vehiculoAPI.anio})`);
+                        setIsBuscando(false);
+                        return;
+                    }
+                    console.log(`[Búsqueda] ❌ No encontrado en GetAPI`);
+                } catch (error) {
+                    // Si hay error de API (límite, key inválida, etc), mostrar mensaje pero continuar con fallback
+                    console.error(`[Búsqueda] ⚠️ Error en GetAPI:`, error);
+                    if (error instanceof Error) {
+                        setEstadoBusqueda(`⚠️ ${error.message}. Intentando con datos locales...`);
+                    }
+                }
+            } else {
+                console.warn(`[Búsqueda] ⚠️ GetAPI no configurada. Crea archivo .env.local con NEXT_PUBLIC_GETAPI_KEY`);
             }
-            if (servicioId === 'otro') {
-                setOtroDescripcion('');
+
+            // 3. Fallback a datos mock (para testing)
+            const found = MOCK_DB[p];
+            if (found) {
+                setMarca(found.marca);
+                setModelo(found.modelo);
+                setAnio(found.anio);
+                setMotor(found.motor);
+                setVehiculoLocked(false);
+                setEstadoBusqueda(`✅ Vehículo encontrado (datos de prueba): ${found.marca} ${found.modelo} (${found.anio})`);
+            } else {
+                // 4. No encontrado en ningún lado
+                setMarca('');
+                setModelo('');
+                setAnio('');
+                setMotor('');
+                setVehiculoLocked(false);
+                setEstadoBusqueda('❌ Patente no encontrada. Completa los datos manualmente.');
             }
+        } finally {
+            setIsBuscando(false);
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setFotos(Array.from(e.target.files));
-        }
+    const agregarFila = (prefill?: { descripcion?: string }) => {
+        setServicios((prev) => {
+            const next = [...prev, { descripcion: prefill?.descripcion || '', precio: '' }];
+            const idx = next.length - 1;
+            setFocusTarget({ index: idx, field: prefill?.descripcion ? 'precio' : 'desc' });
+            return next;
+        });
     };
 
-    const resetForm = () => {
-        setClienteNombre('');
-        setClienteTelefono('');
-        setPatente('');
-        setMarca('');
-        setModelo('');
-        setCC('');
-        setAnio('');
-        setServiciosSeleccionados({});
-        setValoresServicios({});
+    const activarServicioKm = () => {
+        setKmEnabled(true);
+        setServicios((prev) => {
+            const emptyIndex = prev.findIndex((s) => {
+                const d = s.descripcion.trim();
+                const p = parsePrecio(s.precio);
+                return !d && p === 0;
+            });
+
+            const kmDesc = buildKmServiceDescripcion(kmActual, kmNuevo);
+
+            if (emptyIndex >= 0) {
+                const next = prev.map((s, i) => (i === emptyIndex ? { ...s, descripcion: kmDesc } : s));
+                setKmServiceIndex(emptyIndex);
+                setFocusTarget({ index: emptyIndex, field: 'precio' });
+                return next;
+            }
+
+            const next = [...prev, { descripcion: kmDesc, precio: '' }];
+            const idx = next.length - 1;
+            setKmServiceIndex(idx);
+            setFocusTarget({ index: idx, field: 'precio' });
+            return next;
+        });
+    };
+
+    const desactivarServicioKm = () => {
+        setKmEnabled(false);
         setKmActual('');
         setKmNuevo('');
-        setOtroDescripcion('');
-        setDetallesIngreso('');
-        setFotos([]);
-        setSearchStatus('idle');
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+        setServicios((prev) => {
+            if (kmServiceIndex === null) return prev;
+            const next = prev.filter((_, i) => i !== kmServiceIndex);
+            return next.length ? next : [{ descripcion: '', precio: '' }];
+        });
+        setKmServiceIndex(null);
+    };
+
+    useEffect(() => {
+        if (!kmEnabled) return;
+        if (kmServiceIndex === null) return;
+
+        setServicios((prev) => {
+            if (kmServiceIndex < 0 || kmServiceIndex >= prev.length) return prev;
+            const desired = buildKmServiceDescripcion(kmActual, kmNuevo);
+            const current = prev[kmServiceIndex]?.descripcion || '';
+            if (current === desired) return prev;
+            return prev.map((s, i) => (i === kmServiceIndex ? { ...s, descripcion: desired } : s));
+        });
+    }, [kmEnabled, kmServiceIndex, kmActual, kmNuevo]);
+
+    const agregarServicioFrecuente = (descripcion: string) => {
+        const desc = descripcion.trim();
+        if (!desc) return;
+
+        setServicios((prev) => {
+            const emptyIndex = prev.findIndex((s) => {
+                const d = s.descripcion.trim();
+                const p = parsePrecio(s.precio);
+                return !d && p === 0;
+            });
+
+            if (emptyIndex >= 0) {
+                const next = prev.map((s, i) => (i === emptyIndex ? { ...s, descripcion: desc } : s));
+                setFocusTarget({ index: emptyIndex, field: 'precio' });
+                return next;
+            }
+
+            const next = [...prev, { descripcion: desc, precio: '' }];
+            setFocusTarget({ index: next.length - 1, field: 'precio' });
+            return next;
+        });
+    };
+
+    const eliminarFila = (index: number) => {
+        setServicios((prev) => {
+            const next = prev.filter((_, i) => i !== index);
+            return next.length ? next : [{ descripcion: '', precio: '' }];
+        });
+
+        if (kmServiceIndex !== null) {
+            if (index === kmServiceIndex) {
+                setKmEnabled(false);
+                setKmActual('');
+                setKmNuevo('');
+                setKmServiceIndex(null);
+            } else if (index < kmServiceIndex) {
+                setKmServiceIndex(kmServiceIndex - 1);
+            }
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const updateServicio = (index: number, patch: Partial<Servicio>) => {
+        setServicios((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+    };
 
-        if (!patente || !clienteNombre || !clienteTelefono) {
-            alert('Por favor completa los datos del cliente y la patente');
+    const crearSoloOrden = async () => {
+        const p = normalizePatente(patente);
+        if (!user) {
+            alert('Sesión no encontrada. Inicia sesión nuevamente.');
+            return;
+        }
+        if (!p) {
+            alert('Ingresa una patente.');
+            return;
+        }
+        if (!marca || !modelo || !anio || !motor) {
+            alert('Completa los datos del vehículo (Marca, Modelo, Año, Motor).');
+            return;
+        }
+        if (kmEnabled) {
+            if (!kmActual || parsePrecio(kmActual) <= 0 || !kmNuevo || parsePrecio(kmNuevo) <= 0) {
+                alert('Ingresa KM actual y KM nuevo.');
+                return;
+            }
+            if (kmServiceIndex === null) {
+                alert('Activa el servicio KM para poder cobrarlo.');
+                return;
+            }
+        }
+
+        const serviciosForOrder = servicios
+            .map((s) => ({ descripcion: s.descripcion.trim(), precio: parsePrecio(s.precio) }))
+            .filter((s) => s.descripcion || s.precio);
+
+        if (serviciosForOrder.length === 0) {
+            alert('Agrega al menos un servicio.');
             return;
         }
 
-        const serviciosActivos = Object.keys(serviciosSeleccionados).filter(k => serviciosSeleccionados[k]);
-        if (serviciosActivos.length === 0) {
-            alert('Por favor selecciona al menos un servicio');
-            return;
-        }
+        const detalleServicios = serviciosForOrder
+            .map((s) => `- ${s.descripcion || 'Servicio'}: $${moneyCL(s.precio)}`)
+            .join('\n');
+
+        const descripcionIngreso = [`Motor: ${motor}`, '', 'Servicios:', detalleServicios].join('\n');
 
         setIsSubmitting(true);
-
         try {
-            // Crear vehículo si no existe
-            if (searchStatus !== 'found') {
+            const existingVeh = await buscarVehiculoPorPatente(p);
+            if (!existingVeh) {
                 await crearVehiculo({
-                    patente: patente.toUpperCase(),
-                    marca: marca || 'Sin datos',
-                    modelo: modelo || 'Sin datos',
-                    anio: anio || String(new Date().getFullYear()),
-                    color: 'Sin datos',
+                    patente: p,
+                    marca,
+                    modelo,
+                    anio,
+                    color: '-',
                     cliente_id: null,
                 });
             }
 
-            // Construir descripción de servicios
-            let descripcionServicios = 'SERVICIOS SOLICITADOS:\n';
-            serviciosActivos.forEach(servicioId => {
-                const servicio = SERVICIOS.find(s => s.id === servicioId);
-                if (servicio) {
-                    descripcionServicios += `- ${servicio.label}`;
-                    if (valoresServicios[servicioId]) {
-                        descripcionServicios += ` (Valor: $${valoresServicios[servicioId]})`;
-                    }
-                    descripcionServicios += '\n';
-                }
-            });
-
-            if (serviciosSeleccionados['km']) {
-                descripcionServicios += `  KM Actual: ${kmActual}, KM Nuevo: ${kmNuevo}\n`;
-            }
-            if (serviciosSeleccionados['otro']) {
-                descripcionServicios += `  Descripción: ${otroDescripcion}\n`;
-            }
-            if (detallesIngreso) {
-                descripcionServicios += `\nDETALLES AL INGRESO:\n${detallesIngreso}`;
-            }
-
             const orden = await crearOrden({
-                patente_vehiculo: patente.toUpperCase(),
-                descripcion_ingreso: descripcionServicios,
-                creado_por: user?.id || '',
+                patente_vehiculo: p,
+                descripcion_ingreso: descripcionIngreso,
+                creado_por: user.id,
                 estado: 'pendiente',
-                fotos: [],
-                cliente_nombre: clienteNombre,
-                cliente_telefono: clienteTelefono,
+                asignado_a: user.id,
+                cliente_nombre: clienteNombre || undefined,
+                cliente_telefono: clienteWhatsapp || undefined,
+                precio_total: total || undefined,
+                fotos: fotos.length ? fotos : undefined,
+                detalles_vehiculo: detallesVehiculo.trim() || undefined,
             });
 
             if (!orden) {
-                throw new Error('Error al crear orden');
+                alert('No se pudo crear la orden.');
+                return;
             }
 
-            setCreatedOrderId(orden.id);
-            setSubmitSuccess(true);
-            resetForm();
+            setSuccessMsg(`Orden #${orden.id} creada`);
 
-            setTimeout(() => {
-                setSubmitSuccess(false);
-                setCreatedOrderId(null);
-            }, 5000);
-        } catch (error) {
-            console.error('Error al registrar:', error);
-            alert('Error al crear la orden. Intenta nuevamente.');
+            if (user.role === 'admin') {
+                router.push(`/admin/ordenes/clean?id=${orden.id}`);
+            } else {
+                limpiar();
+            }
         } finally {
             setIsSubmitting(false);
+            setTimeout(() => setSuccessMsg(null), 2500);
         }
     };
 
+    const limpiar = () => {
+        setPatente('');
+        setMarca('');
+        setModelo('');
+        setAnio('');
+        setMotor('');
+        setKmEnabled(false);
+        setKmActual('');
+        setKmNuevo('');
+        setKmServiceIndex(null);
+        setVehiculoLocked(true);
+        setEstadoBusqueda('');
+        setClienteNombre('');
+        setClienteWhatsapp('');
+        setDetallesVehiculo('');
+        setFotos([]);
+        setServicios([{ descripcion: '', precio: '' }]);
+    };
+
     return (
-        <div className="max-w-4xl mx-auto pb-20">
-            {/* Success Toast */}
-            {submitSuccess && (
-                <div className="fixed top-24 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-50 animate-in fade-in slide-in-from-top-5 duration-300">
-                    <div className="bg-[#1a1a1a] border border-[#0066FF]/30 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-[#0066FF]/20 flex items-center gap-4">
-                        <div className="w-12 h-12 bg-[#0066FF]/20 rounded-full flex items-center justify-center border border-[#0066FF]/50">
-                            <CheckCircle2 className="w-6 h-6 text-[#0066FF]" />
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg">¡Orden #{createdOrderId} Creada!</p>
-                            <p className="text-sm text-gray-400">Vehículo ingresado exitosamente</p>
-                        </div>
+        <div className="mx-auto max-w-5xl space-y-6">
+            {successMsg ? (
+                <div className="fixed top-20 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-50">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-2">
+                        <span className="font-semibold">{successMsg}</span>
                     </div>
                 </div>
-            )}
+            ) : null}
 
-            {/* Page Header */}
-            <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 bg-[#0066FF] rounded-xl flex items-center justify-center">
-                        <Car className="w-5 h-5 text-white" />
+            <div className="rounded-2xl bg-gradient-to-br from-blue-700 to-blue-900 px-6 py-5 shadow">
+                <div className="text-xl font-bold text-white">Nueva Orden de Trabajo</div>
+                <div className="mt-1 text-sm text-blue-100">{fechaHora}</div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5">
+                <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">RESPONSABLES</div>
+                <label className="text-sm font-semibold text-slate-200">Mecánico Responsable</label>
+                <input
+                    value={mecanico}
+                    readOnly
+                    className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                />
+                <div className="mt-2 text-xs text-slate-400">Se completa automáticamente con el usuario actual (si existe).</div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5">
+                <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">VEHÍCULO</div>
+
+                <div className="grid gap-3 md:grid-cols-[1fr_240px] md:items-end">
+                    <div>
+                        <label className="text-sm font-semibold text-slate-200">Patente</label>
+                        <input
+                            value={patente}
+                            onChange={(e) => setPatente(normalizePatente(e.target.value))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    buscarPatente();
+                                }
+                            }}
+                            placeholder="AA-BB-11"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-4 text-center font-mono text-2xl font-bold uppercase tracking-widest text-white"
+                            maxLength={6}
+                        />
+                        <div className="mt-2 text-xs text-slate-400">Ejemplos: PROFE1, BBBB10, TEST01</div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={buscarPatente}
+                        disabled={isBuscando}
+                        className="h-[54px] rounded-xl bg-blue-600 px-4 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isBuscando ? '🔄 Buscando...' : '🔍 Buscar'}
+                    </button>
+                </div>
+
+                {estadoBusqueda ? <div className="mt-3 text-sm text-slate-300">{estadoBusqueda}</div> : null}
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label className="text-sm font-semibold text-slate-200">Marca</label>
+                        <input
+                            value={marca}
+                            onChange={(e) => setMarca(e.target.value)}
+                            readOnly={vehiculoLocked}
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                        />
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-white">Orden de Servicio</h1>
-                        <p className="text-sm text-gray-400">Registro de ingreso de vehículos</p>
+                        <label className="text-sm font-semibold text-slate-200">Modelo</label>
+                        <input
+                            value={modelo}
+                            onChange={(e) => setModelo(e.target.value)}
+                            readOnly={vehiculoLocked}
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-semibold text-slate-200">Año</label>
+                        <input
+                            value={anio}
+                            onChange={(e) => setAnio(e.target.value)}
+                            readOnly={vehiculoLocked}
+                            inputMode="numeric"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-semibold text-slate-200">Motor</label>
+                        <input
+                            value={motor}
+                            onChange={(e) => setMotor(e.target.value)}
+                            readOnly={vehiculoLocked}
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                        />
                     </div>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-                {/* DATOS CLIENTE */}
-                <div className="bg-[#1a1a1a] rounded-2xl border border-[#333333] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4 border-b border-[#333333] pb-2">DATOS CLIENTE</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label className="text-gray-300 text-sm mb-2 block">NOMBRE: *</Label>
-                            <Input
-                                type="text"
-                                value={clienteNombre}
-                                onChange={(e) => setClienteNombre(e.target.value)}
-                                placeholder="Nombre completo del cliente"
-                                className="h-12 bg-[#121212] border-[#333333] text-white rounded-xl focus:border-[#0066FF] focus:shadow-[0_0_15px_rgba(0,102,255,0.2)] transition-all"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-gray-300 text-sm mb-2 block">TELÉFONO: *</Label>
-                            <Input
-                                type="tel"
-                                value={clienteTelefono}
-                                onChange={(e) => setClienteTelefono(e.target.value)}
-                                placeholder="+56912345678"
-                                className="h-12 bg-[#121212] border-[#333333] text-white rounded-xl focus:border-[#0066FF] focus:shadow-[0_0_15px_rgba(0,102,255,0.2)] transition-all"
-                                required
-                            />
-                        </div>
+            <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5">
+                <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">CLIENTE</div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label className="text-sm font-semibold text-slate-200">Nombre</label>
+                        <input
+                            value={clienteNombre}
+                            onChange={(e) => setClienteNombre(e.target.value)}
+                            placeholder="Nombre del cliente"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-semibold text-slate-200">WhatsApp</label>
+                        <input
+                            value={clienteWhatsapp}
+                            onChange={(e) => setClienteWhatsapp(e.target.value.replace(/[^0-9]/g, '').slice(0, 15))}
+                            inputMode="numeric"
+                            placeholder="569XXXXXXXX"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                        />
+                        <div className="mt-2 text-xs text-slate-400">Usa formato internacional sin + (ej: 56912345678).</div>
                     </div>
                 </div>
+            </div>
 
-                {/* VEHÍCULO INGRESADO */}
-                <div className="bg-[#1a1a1a] rounded-2xl border border-[#333333] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4 border-b border-[#333333] pb-2">VEHÍCULO INGRESADO</h3>
-                    
-                    {/* Patente con búsqueda */}
-                    <div className="mb-4">
-                        <Label className="text-gray-300 text-sm mb-2 block">PATENTE *</Label>
-                        <div className="flex gap-3">
-                            <Input
-                                type="text"
-                                value={patente}
-                                onChange={(e) => setPatente(e.target.value.toUpperCase())}
-                                onBlur={handlePatenteLookup}
-                                placeholder="ABCD12"
-                                className="h-14 text-xl font-mono font-bold tracking-[0.3em] text-center bg-[#121212] border-[#333333] text-white rounded-xl focus:border-[#0066FF] focus:shadow-[0_0_20px_rgba(0,102,255,0.3)] transition-all"
-                                maxLength={6}
-                                required
-                            />
-                            <Button
-                                type="button"
-                                onClick={handlePatenteLookup}
-                                disabled={isSearching || !patente}
-                                className="h-14 w-14 bg-[#0066FF] hover:bg-[#0052CC] rounded-xl"
-                            >
-                                {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                            </Button>
-                        </div>
-                        {searchStatus === 'found' && (
-                            <p className="text-green-400 text-sm mt-2 flex items-center gap-2">
-                                <Sparkles className="w-4 h-4" /> Vehículo encontrado en base de datos
-                            </p>
-                        )}
-                        {searchStatus === 'not_found' && (
-                            <p className="text-amber-400 text-sm mt-2 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4" /> No encontrado - completa los datos manualmente
-                            </p>
-                        )}
-                    </div>
+            <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5">
+                <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">SERVICIOS</div>
 
-                    {/* Datos del vehículo */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        <div>
-                            <Label className="text-gray-300 text-xs mb-1 block">MARCA</Label>
-                            <Input
-                                value={marca}
-                                onChange={(e) => setMarca(e.target.value)}
-                                className="h-10 bg-[#121212] border-[#333333] text-white rounded-lg text-sm"
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-gray-300 text-xs mb-1 block">MODELO</Label>
-                            <Input
-                                value={modelo}
-                                onChange={(e) => setModelo(e.target.value)}
-                                className="h-10 bg-[#121212] border-[#333333] text-white rounded-lg text-sm"
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-gray-300 text-xs mb-1 block">CC</Label>
-                            <Input
-                                value={cc}
-                                onChange={(e) => setCC(e.target.value)}
-                                placeholder="1600"
-                                className="h-10 bg-[#121212] border-[#333333] text-white rounded-lg text-sm"
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-gray-300 text-xs mb-1 block">AÑO</Label>
-                            <Input
-                                value={anio}
-                                onChange={(e) => setAnio(e.target.value)}
-                                placeholder="2020"
-                                className="h-10 bg-[#121212] border-[#333333] text-white rounded-lg text-sm"
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-gray-300 text-xs mb-1 block">FECHA INGRESO</Label>
-                            <Input
-                                value={new Date().toLocaleDateString('es-CL')}
-                                disabled
-                                className="h-10 bg-[#121212] border-[#333333] text-gray-400 rounded-lg text-sm"
-                            />
-                        </div>
-                    </div>
+                <div className="mb-4 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => (kmEnabled ? desactivarServicioKm() : activarServicioKm())}
+                        className={
+                            kmEnabled
+                                ? 'rounded-full border border-blue-500 bg-blue-600/30 px-3 py-2 text-sm font-semibold text-blue-100'
+                                : 'rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700'
+                        }
+                    >
+                        🔘 KM
+                    </button>
+                    {SERVICIOS_FRECUENTES.map((s) => (
+                        <button
+                            key={s}
+                            type="button"
+                            onClick={() => agregarServicioFrecuente(s)}
+                            className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700"
+                        >
+                            🔘 {s}
+                        </button>
+                    ))}
                 </div>
 
-                {/* CHECKLIST DE SERVICIOS */}
-                <div className="bg-[#1a1a1a] rounded-2xl border border-[#333333] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4 border-b border-[#333333] pb-2">SERVICIOS SOLICITADOS</h3>
-                    <div className="space-y-4">
-                        {SERVICIOS.map((servicio) => (
-                            <div key={servicio.id} className="space-y-2">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <Checkbox
-                                            id={servicio.id}
-                                            checked={serviciosSeleccionados[servicio.id] || false}
-                                            onCheckedChange={(checked) => handleServicioToggle(servicio.id, checked as boolean)}
-                                            className="border-[#0066FF] data-[state=checked]:bg-[#0066FF]"
+                {kmEnabled ? (
+                    <div className="mb-4 grid gap-4 rounded-xl border border-slate-700 bg-slate-800/30 p-4 md:grid-cols-2">
+                        <div>
+                            <label className="text-sm font-semibold text-slate-200">KM actual</label>
+                            <input
+                                value={formatMilesConPunto(kmActual)}
+                                onChange={(e) => setKmActual(e.target.value.replace(/[^0-9]/g, '').slice(0, 7))}
+                                inputMode="numeric"
+                                placeholder="Ej: 200.000"
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-2xl font-bold font-mono tracking-wide text-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-semibold text-slate-200">KM nuevo</label>
+                            <input
+                                value={formatMilesConPunto(kmNuevo)}
+                                onChange={(e) => setKmNuevo(e.target.value.replace(/[^0-9]/g, '').slice(0, 7))}
+                                inputMode="numeric"
+                                placeholder="Ej: 120.000"
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-2xl font-bold font-mono tracking-wide text-white"
+                            />
+                        </div>
+                        <div className="md:col-span-2 text-xs text-slate-400">
+                            Se agrega como servicio cobrable. Define el precio en la fila de KM.
+                        </div>
+                    </div>
+                ) : null}
+
+                <div className="overflow-hidden rounded-xl border border-slate-700">
+                    <table className="w-full">
+                        <thead className="bg-slate-800/70">
+                            <tr>
+                                <th className="px-3 py-3 text-left text-xs font-semibold tracking-widest text-slate-300">DESCRIPCIÓN</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold tracking-widest text-slate-300">PRECIO ($)</th>
+                                <th className="px-3 py-3 text-right text-xs font-semibold tracking-widest text-slate-300">ACCIÓN</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700">
+                            {servicios.map((s, idx) => (
+                                <tr key={idx} className="bg-slate-900/40">
+                                    <td className="px-3 py-3">
+                                        <input
+                                            ref={(r) => {
+                                                descRefs.current[idx] = r;
+                                            }}
+                                            value={s.descripcion}
+                                            onChange={(e) => updateServicio(idx, { descripcion: e.target.value })}
+                                            placeholder="Ej: Scanner"
+                                            className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-3 text-white"
                                         />
-                                        <Label htmlFor={servicio.id} className="text-white font-medium cursor-pointer">
-                                            {servicio.label}
-                                        </Label>
-                                    </div>
-                                    {servicio.requiresValue && serviciosSeleccionados[servicio.id] && (
-                                        <Input
-                                            type="number"
-                                            placeholder="Valor $"
-                                            value={valoresServicios[servicio.id] || ''}
-                                            onChange={(e) => setValoresServicios(prev => ({
-                                                ...prev,
-                                                [servicio.id]: e.target.value
-                                            }))}
-                                            className="w-32 h-10 bg-[#121212] border-[#333333] text-white rounded-lg"
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <input
+                                            ref={(r) => {
+                                                precioRefs.current[idx] = r;
+                                            }}
+                                            value={s.precio}
+                                            onChange={(e) => updateServicio(idx, { precio: e.target.value.replace(/[^0-9]/g, '').slice(0, 9) })}
+                                            inputMode="numeric"
+                                            placeholder="0"
+                                            className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-3 text-white"
                                         />
-                                    )}
-                                </div>
+                                    </td>
+                                    <td className="px-3 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            onClick={() => eliminarFila(idx)}
+                                            className="rounded-xl bg-red-600 px-3 py-3 text-sm font-semibold text-white hover:bg-red-700"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
 
-                                {/* Campo condicional para KM */}
-                                {servicio.id === 'km' && serviciosSeleccionados['km'] && (
-                                    <div className="ml-8 grid grid-cols-2 gap-3 bg-[#121212] p-3 rounded-lg">
-                                        <div>
-                                            <Label className="text-gray-400 text-xs mb-1 block">KM Actual</Label>
-                                            <Input
-                                                type="number"
-                                                value={kmActual}
-                                                onChange={(e) => setKmActual(e.target.value)}
-                                                placeholder="50000"
-                                                className="h-10 bg-[#0a0a0a] border-[#333333] text-white rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-gray-400 text-xs mb-1 block">KM Nuevo</Label>
-                                            <Input
-                                                type="number"
-                                                value={kmNuevo}
-                                                onChange={(e) => setKmNuevo(e.target.value)}
-                                                placeholder="60000"
-                                                className="h-10 bg-[#0a0a0a] border-[#333333] text-white rounded-lg"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Campo condicional para OTRO */}
-                                {servicio.id === 'otro' && serviciosSeleccionados['otro'] && (
-                                    <div className="ml-8 bg-[#121212] p-3 rounded-lg">
-                                        <Label className="text-gray-400 text-xs mb-1 block">Descripción del servicio</Label>
-                                        <Textarea
-                                            value={otroDescripcion}
-                                            onChange={(e) => setOtroDescripcion(e.target.value)}
-                                            placeholder="Describe el servicio requerido..."
-                                            className="min-h-[80px] bg-[#0a0a0a] border-[#333333] text-white rounded-lg resize-none"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                <div className="mt-4 flex flex-col gap-3 rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <div className="text-xs font-semibold tracking-widest text-slate-300">TOTAL</div>
+                        <div className="text-2xl font-extrabold text-white">${moneyCL(total)}</div>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => agregarFila()}
+                        className="rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700"
+                    >
+                        + Agregar Servicio
+                    </button>
                 </div>
+            </div>
 
-                {/* DETALLES DEL VEHÍCULO AL INGRESO */}
-                <div className="bg-[#1a1a1a] rounded-2xl border border-[#333333] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4 border-b border-[#333333] pb-2">DETALLES DEL VEHÍCULO AL INGRESO</h3>
-                    <Textarea
-                        value={detallesIngreso}
-                        onChange={(e) => setDetallesIngreso(e.target.value)}
-                        placeholder="Describe el estado del vehículo, observaciones, daños previos, etc..."
-                        className="min-h-[120px] bg-[#121212] border-[#333333] text-white rounded-xl resize-none focus:border-[#0066FF] focus:shadow-[0_0_15px_rgba(0,102,255,0.2)] transition-all"
-                    />
-                </div>
+            <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5">
+                <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">DETALLES DEL VEHÍCULO</div>
+                <label className="text-sm font-semibold text-slate-200">Descripción general</label>
+                <textarea
+                    value={detallesVehiculo}
+                    onChange={(e) => setDetallesVehiculo(e.target.value)}
+                    placeholder="Ej: ruido al encender, vibración, luces de tablero, etc."
+                    className="mt-2 min-h-[120px] w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                />
 
-                {/* FOTOS */}
-                <div className="bg-[#1a1a1a] rounded-2xl border border-[#333333] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4 border-b border-[#333333] pb-2">FOTOGRAFÍAS</h3>
+                <div className="mt-5">
+                    <label className="text-sm font-semibold text-slate-200 block mb-2">Imágenes</label>
                     <input
-                        ref={fileInputRef}
                         type="file"
+                        id="file-upload"
                         accept="image/*"
                         multiple
-                        onChange={handleFileChange}
+                        onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (!files.length) return;
+                            setIsUploading(true);
+                            try {
+                                const uploads = await Promise.all(files.map((f) => subirImagen(f, 'ordenes')));
+                                const ok = uploads.filter(Boolean) as string[];
+                                setFotos((prev) => [...prev, ...ok]);
+                            } finally {
+                                setIsUploading(false);
+                                e.target.value = '';
+                            }
+                        }}
                         className="hidden"
-                        id="fotos"
                     />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full h-12 border-[#333333] bg-[#121212] text-gray-300 hover:bg-[#242424] rounded-xl"
-                    >
-                        <Camera className="w-5 h-5 mr-2" />
-                        Agregar Fotos del Vehículo
-                        {fotos.length > 0 && (
-                            <Badge className="ml-2 bg-[#0066FF] text-white">{fotos.length}</Badge>
-                        )}
-                    </Button>
-                </div>
+                    <input
+                        type="file"
+                        id="camera-capture"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (!files.length) return;
+                            setIsUploading(true);
+                            try {
+                                const uploads = await Promise.all(files.map((f) => subirImagen(f, 'ordenes')));
+                                const ok = uploads.filter(Boolean) as string[];
+                                setFotos((prev) => [...prev, ...ok]);
+                            } finally {
+                                setIsUploading(false);
+                                e.target.value = '';
+                            }
+                        }}
+                        className="hidden"
+                    />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <label
+                            htmlFor="file-upload"
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-600 bg-slate-800/50 px-6 py-4 font-semibold text-slate-200 hover:bg-slate-700/50 hover:border-slate-500 cursor-pointer transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span>Seleccionar imágenes</span>
+                        </label>
+                        <label
+                            htmlFor="camera-capture"
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-600 bg-blue-800/30 px-6 py-4 font-semibold text-blue-200 hover:bg-blue-700/50 hover:border-blue-500 cursor-pointer transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>Tomar foto</span>
+                        </label>
+                    </div>
+                    {isUploading ? <div className="mt-2 text-xs text-slate-400">Subiendo imágenes...</div> : null}
 
-                {/* BOTÓN GENERAR ORDEN */}
-                <Button
-                    type="submit"
+                    {fotos.length ? (
+                        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                            {fotos.map((src, idx) => (
+                                <div key={idx} className="rounded-xl border border-slate-700 bg-slate-800/30 p-2">
+                                    <img src={src} alt={`foto-${idx}`} className="h-28 w-full rounded-lg object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setFotos((prev) => prev.filter((_, i) => i !== idx))}
+                                        className="mt-2 w-full rounded-lg bg-red-600 px-2 py-2 text-xs font-semibold text-white hover:bg-red-700"
+                                    >
+                                        Quitar
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-3 pb-10 md:flex-row md:justify-end">
+                <button
+                    type="button"
+                    onClick={crearSoloOrden}
                     disabled={isSubmitting}
-                    className="w-full h-16 bg-[#0066FF] hover:bg-[#0052CC] text-white text-lg font-bold rounded-2xl shadow-xl shadow-[#0066FF]/25 disabled:opacity-50 transition-all"
+                    className="rounded-xl bg-green-600 px-5 py-3 font-bold text-white hover:bg-green-700 disabled:opacity-60"
                 >
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="w-6 h-6 mr-3 animate-spin" />
-                            Generando Orden...
-                        </>
-                    ) : (
-                        <>
-                            <CheckCircle2 className="w-6 h-6 mr-3" />
-                            GENERAR ORDEN DE SERVICIO
-                        </>
-                    )}
-                </Button>
-            </form>
+                    {isSubmitting ? 'Creando...' : 'Crear Orden'}
+                </button>
+                <button
+                    type="button"
+                    onClick={limpiar}
+                    className="rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-3 font-semibold text-slate-200 hover:bg-slate-700"
+                >
+                    🗑️ Limpiar
+                </button>
+            </div>
         </div>
     );
 }

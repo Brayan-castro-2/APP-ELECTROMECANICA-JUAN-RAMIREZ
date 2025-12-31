@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { crearUsuario } from '@/lib/local-storage-service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,42 +34,11 @@ export default function SetupPage() {
         setError('');
 
         try {
-            // 1. Crear usuario en Supabase Auth
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: adminEmail,
-                password: adminPassword,
-                options: {
-                    data: {
-                        name: adminName,
-                        role: 'admin'
-                    }
-                }
-            });
+            // Crear usuario en localStorage
+            const result = await crearUsuario(adminEmail, adminPassword, adminName, 'admin');
 
-            if (authError) {
-                throw new Error(authError.message);
-            }
-
-            if (!authData.user) {
-                throw new Error('No se pudo crear el usuario');
-            }
-
-            // 2. Crear perfil en la tabla perfiles
-            const { error: perfilError } = await supabase
-                .from('perfiles')
-                .insert([{
-                    id: authData.user.id,
-                    nombre_completo: adminName,
-                    rol: 'admin',
-                    activo: true
-                }]);
-
-            if (perfilError) {
-                console.error('Error al crear perfil:', perfilError);
-                // Si ya existe el perfil, ignoramos el error
-                if (!perfilError.message.includes('duplicate')) {
-                    throw new Error('Error al crear perfil: ' + perfilError.message);
-                }
+            if (!result.success) {
+                throw new Error(result.error || 'Error al crear usuario');
             }
 
             setSuccess(`Usuario admin "${adminEmail}" creado exitosamente`);

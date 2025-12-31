@@ -53,9 +53,8 @@ export default function LoginPage() {
                         </div>
                         <h1 className="text-2xl font-bold text-white mb-2">
                             ELECTROMECÁNICA <br />
-                            <span className="text-[#0066FF]">JUAN RAMÍREZ</span>
+                            <span className="text-[#0066FF]">JR</span>
                         </h1>
-                        <p className="text-gray-400">Sistema de Gestión de Taller</p>
                     </div>
 
                     {/* Login Form */}

@@ -1,8 +1,9 @@
 'use client';
 
-import { OrdenDB, VehiculoDB, PerfilDB } from '@/lib/supabase';
+import { OrdenDB, VehiculoDB, PerfilDB } from '@/lib/local-storage-service';
 import { Button } from '@/components/ui/button';
-import { Printer, Mail } from 'lucide-react';
+import { Download, MessageCircle, Mail, Printer } from 'lucide-react';
+import { useRef } from 'react';
 
 interface BoletaFacturaProps {
     orden: OrdenDB;
@@ -11,8 +12,50 @@ interface BoletaFacturaProps {
 }
 
 export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps) {
+    const boletaRef = useRef<HTMLDivElement | null>(null);
+
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleDownloadPdf = async () => {
+        const el = boletaRef.current;
+        if (!el) return;
+
+        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+            import('html2canvas'),
+            import('jspdf'),
+        ]);
+
+        const canvas = await html2canvas(el, {
+            scale: 2,
+            backgroundColor: '#ffffff',
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+            orientation: 'p',
+            unit: 'px',
+            format: [canvas.width, canvas.height],
+        });
+
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save(`boleta-${orden.id}.pdf`);
+    };
+
+    const handleWhatsApp = () => {
+        const phone = (orden.cliente_telefono || '').replace(/\D/g, '');
+        if (!phone) {
+            alert('El cliente no tiene teléfono registrado.');
+            return;
+        }
+
+        const total = orden.precio_total ? `$${orden.precio_total.toLocaleString('es-CL')}` : 'Por definir';
+        const vehiculoStr = vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : orden.patente_vehiculo;
+
+        const text = `Hola ${orden.cliente_nombre || 'Cliente'},\n\nSu vehículo *${vehiculoStr}* (Patente: ${orden.patente_vehiculo}) está listo.\n\n*Total a pagar: ${total}*\n\nGracias por preferir Electromecánica JR.`;
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
     };
 
     const handleEmail = async () => {
@@ -49,6 +92,21 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
                     Imprimir
                 </Button>
                 <Button
+                    onClick={handleDownloadPdf}
+                    variant="outline"
+                    className="border-[#333333] text-gray-300 hover:bg-[#242424]"
+                >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar PDF
+                </Button>
+                <Button
+                    onClick={handleWhatsApp}
+                    className="bg-[#25D366] hover:bg-[#128C7E] text-white"
+                >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    WhatsApp
+                </Button>
+                <Button
                     onClick={handleEmail}
                     variant="outline"
                     className="border-[#333333] text-gray-300 hover:bg-[#242424]"
@@ -59,14 +117,13 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
             </div>
 
             {/* Boleta/Factura - Se imprime */}
-            <div className="bg-white text-black p-8 rounded-lg print:shadow-none print:p-0">
+            <div ref={boletaRef} className="bg-white text-black p-8 rounded-lg print:shadow-none print:p-0">
                 {/* Header */}
                 <div className="border-b-2 border-black pb-4 mb-6">
                     <div className="flex justify-between items-start">
                         <div>
                             <h1 className="text-3xl font-bold">ELECTROMECÁNICA</h1>
-                            <h2 className="text-2xl font-bold text-[#0066FF]">JUAN RAMÍREZ</h2>
-                            <p className="text-sm mt-2">Servicio Automotriz Integral</p>
+                            <h2 className="text-2xl font-bold text-[#0066FF]">JR</h2>
                         </div>
                         <div className="text-right">
                             <p className="text-2xl font-bold">BOLETA #{orden.id}</p>

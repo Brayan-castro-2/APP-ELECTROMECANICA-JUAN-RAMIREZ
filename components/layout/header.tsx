@@ -91,11 +91,8 @@ export function Header() {
                     </div>
                     <div className="hidden md:block">
                         <h1 className="text-xl font-bold text-white leading-none tracking-tight">
-                            ELECTROMECÁNICA <span className="text-[#0066FF]">JUAN RAMÍREZ</span>
+                            ELECTROMECÁNICA <span className="text-[#0066FF]">JR</span>
                         </h1>
-                        <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
-                            SERVICIO AUTOMOTRIZ INTEGRAL
-                        </p>
                     </div>
                 </div>
 

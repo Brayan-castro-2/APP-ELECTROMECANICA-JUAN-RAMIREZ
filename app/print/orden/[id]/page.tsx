@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { obtenerOrdenPorId, buscarVehiculoPorPatente, obtenerPerfilPorId } from '@/lib/supabase-service';
-import { OrdenDB, VehiculoDB, PerfilDB } from '@/lib/supabase';
+import { obtenerOrdenPorId, buscarVehiculoPorPatente, obtenerPerfilPorId, type OrdenDB, type VehiculoDB, type PerfilDB } from '@/lib/storage-adapter';
 import { Button } from '@/components/ui/button';
 import { Printer, Loader2 } from 'lucide-react';
 import Image from 'next/image';
@@ -98,8 +97,7 @@ export default function PrintOrdenPage() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 leading-none">ELECTROMECÁNICA</h2>
-                                <h2 className="text-xl font-bold text-[#0066FF] leading-none">JUAN RAMÍREZ</h2>
-                                <p className="text-xs text-gray-500 mt-1 font-medium tracking-wide">SERVICIO AUTOMOTRIZ INTEGRAL</p>
+                                <h2 className="text-xl font-bold text-[#0066FF] leading-none">JR</h2>
                             </div>
                         </div>
                         <div className="text-right">

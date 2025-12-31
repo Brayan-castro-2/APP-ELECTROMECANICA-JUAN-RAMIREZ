@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { obtenerPerfiles, actualizarPerfil, crearUsuario } from '@/lib/supabase-service';
-import { PerfilDB } from '@/lib/supabase';
+import { obtenerPerfiles, actualizarPerfil, crearUsuario, PerfilDB } from '@/lib/local-storage-service';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

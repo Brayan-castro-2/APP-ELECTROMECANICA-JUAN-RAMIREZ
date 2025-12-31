@@ -199,17 +199,56 @@ export async function crearOrden(orden: {
     fotos?: string[];
     cliente_nombre?: string;
     cliente_telefono?: string;
+    precio_total?: number;
+    metodo_pago?: string;
+    asignado_a?: string;
+    detalles_vehiculo?: string;
 }): Promise<OrdenDB | null> {
+    // IMPORTANTE: Primero verificar si el vehículo existe, si no, crearlo
+    const patenteNormalizada = orden.patente_vehiculo.toUpperCase();
+    
+    // Buscar vehículo existente
+    const { data: vehiculoExistente } = await supabase
+        .from('vehiculos')
+        .select('*')
+        .eq('patente', patenteNormalizada)
+        .single();
+    
+    // Si no existe, crear un vehículo básico
+    if (!vehiculoExistente) {
+        console.log(`🚗 Creando vehículo ${patenteNormalizada} automáticamente...`);
+        const { error: vehiculoError } = await supabase
+            .from('vehiculos')
+            .insert([{
+                patente: patenteNormalizada,
+                marca: 'Por definir',
+                modelo: 'Por definir',
+                anio: new Date().getFullYear().toString(),
+                motor: '',
+                color: ''
+            }]);
+        
+        if (vehiculoError) {
+            console.error('Error al crear vehículo:', vehiculoError);
+            return null;
+        }
+    }
+    
+    // Ahora crear la orden
     const { data, error } = await supabase
         .from('ordenes')
         .insert([{
-            patente_vehiculo: orden.patente_vehiculo.toUpperCase(),
+            patente_vehiculo: patenteNormalizada,
             descripcion_ingreso: orden.descripcion_ingreso,
             creado_por: orden.creado_por,
+            asignado_a: orden.asignado_a || orden.creado_por,
             estado: orden.estado || 'pendiente',
             fotos: orden.fotos || [],
             cliente_nombre: orden.cliente_nombre,
             cliente_telefono: orden.cliente_telefono,
+            precio_total: orden.precio_total || 0,
+            metodo_pago: orden.metodo_pago,
+            detalles_vehiculo: orden.detalles_vehiculo,
         }])
         .select()
         .single();
@@ -219,6 +258,7 @@ export async function crearOrden(orden: {
         return null;
     }
 
+    console.log('✅ Orden creada exitosamente en Supabase:', data.id);
     return data;
 }
 

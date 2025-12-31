@@ -6,9 +6,11 @@ import {
     obtenerOrdenPorId,
     actualizarOrden,
     obtenerPerfiles,
-    buscarVehiculoPorPatente
-} from '@/lib/supabase-service';
-import { OrdenDB, PerfilDB, VehiculoDB } from '@/lib/supabase';
+    buscarVehiculoPorPatente,
+    OrdenDB, 
+    PerfilDB, 
+    VehiculoDB 
+} from '@/lib/local-storage-service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,14 @@ export default function OrdenDetailPage() {
     const [descripcion, setDescripcion] = useState('');
     const [estado, setEstado] = useState('pendiente');
     const [asignadoA, setAsignadoA] = useState<string>('');
+
+    useEffect(() => {
+        if (Number.isFinite(orderId)) {
+            router.replace(`/admin/ordenes/clean?id=${orderId}`);
+        } else {
+            router.replace('/admin/ordenes');
+        }
+    }, [router, orderId]);
 
     useEffect(() => {
         const loadData = async () => {
@@ -88,6 +98,10 @@ export default function OrdenDetailPage() {
 
     const handlePrint = () => {
         window.open(`/print/orden/${orderId}`, '_blank');
+    };
+
+    const handleTicket = () => {
+        window.open(`/print/ticket/${orderId}`, '_blank');
     };
 
     const getStatusBadge = (status: string) => {
@@ -151,10 +165,16 @@ export default function OrdenDetailPage() {
                         </p>
                     </div>
                 </div>
-                <Button onClick={handlePrint} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
-                    <Printer className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Imprimir</span>
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleTicket} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                        <Printer className="w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">Ticket</span>
+                    </Button>
+                    <Button onClick={handlePrint} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                        <Printer className="w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">Imprimir Orden</span>
+                    </Button>
+                </div>
             </div>
 
             {/* Vehicle Info */}

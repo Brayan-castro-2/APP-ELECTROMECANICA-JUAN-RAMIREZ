@@ -139,6 +139,36 @@ export async function crearUsuario(
     return localService.crearUsuario(email, password, nombreCompleto, rol);
 }
 
+// ============ AUTENTICACIÓN ============
+
+export async function loginConCredenciales(email: string, password: string): Promise<{
+    user: { id: string; email: string } | null;
+    perfil: PerfilDB | null;
+    error: string | null;
+}> {
+    if (isSupabase()) {
+        return supabaseService.loginConCredenciales(email, password);
+    }
+    return localService.loginConCredenciales(email, password);
+}
+
+export async function logout(): Promise<void> {
+    if (isSupabase()) {
+        return supabaseService.logout();
+    }
+    return localService.logout();
+}
+
+export async function obtenerSesionActual(): Promise<{
+    user: { id: string; email: string } | null;
+    perfil: PerfilDB | null;
+}> {
+    if (isSupabase()) {
+        return supabaseService.obtenerSesionActual();
+    }
+    return localService.obtenerSesionActual();
+}
+
 // ============ INICIALIZACIÓN ============
 
 export function inicializarLocalStorage(): void {

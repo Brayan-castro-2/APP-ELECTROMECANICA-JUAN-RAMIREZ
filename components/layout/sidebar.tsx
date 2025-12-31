@@ -90,37 +90,39 @@ export function Sidebar() {
                 </div>
             </aside>
 
-            {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-lg border-t border-[#333333] safe-area-inset-bottom">
-                <div className="flex items-center justify-around py-2 px-2">
-                    {filteredItems.map((item) => {
-                        const isActive = pathname === item.href ||
-                            (item.href !== '/admin' && item.href !== '/recepcion' && pathname.startsWith(item.href));
+            {/* Mobile Bottom Navigation - Solo para admin */}
+            {user.role === 'admin' && (
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-lg border-t border-[#333333] safe-area-inset-bottom">
+                    <div className="flex items-center justify-around py-2 px-2">
+                        {filteredItems.map((item) => {
+                            const isActive = pathname === item.href ||
+                                (item.href !== '/admin' && item.href !== '/recepcion' && pathname.startsWith(item.href));
 
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                prefetch={true}
-                                className={cn(
-                                    "flex flex-col items-center justify-center py-2 px-4 rounded-2xl transition-colors duration-150 min-w-[72px] touch-target",
-                                    isActive
-                                        ? "bg-[#0066FF] text-white shadow-lg shadow-[#0066FF]/30"
-                                        : "text-gray-500 hover:text-gray-300 active:scale-95"
-                                )}
-                            >
-                                {item.icon}
-                                <span className={cn(
-                                    "text-[10px] font-medium mt-1",
-                                    isActive ? "opacity-100" : "opacity-70"
-                                )}>
-                                    {item.label}
-                                </span>
-                            </Link>
-                        );
-                    })}
-                </div>
-            </nav>
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    prefetch={true}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center py-2 px-4 rounded-2xl transition-colors duration-150 min-w-[72px] touch-target",
+                                        isActive
+                                            ? "bg-[#0066FF] text-white shadow-lg shadow-[#0066FF]/30"
+                                            : "text-gray-500 hover:text-gray-300 active:scale-95"
+                                    )}
+                                >
+                                    {item.icon}
+                                    <span className={cn(
+                                        "text-[10px] font-medium mt-1",
+                                        isActive ? "opacity-100" : "opacity-70"
+                                    )}>
+                                        {item.label}
+                                    </span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </nav>
+            )}
         </>
     );
 }

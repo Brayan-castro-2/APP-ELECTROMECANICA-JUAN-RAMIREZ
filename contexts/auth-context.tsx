@@ -5,9 +5,9 @@ import {
     loginConCredenciales, 
     logout as logoutService, 
     obtenerSesionActual,
-    initializeLocalStorage,
-    PerfilDB 
-} from '@/lib/local-storage-service';
+    inicializarLocalStorage,
+    type PerfilDB 
+} from '@/lib/storage-adapter';
 
 // Usuario del contexto
 export interface AuthUser {
@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const initSession = async () => {
             try {
                 // Inicializar localStorage con datos por defecto
-                initializeLocalStorage();
+                inicializarLocalStorage();
                 
                 // Obtener sesión guardada
                 const result = await obtenerSesionActual();

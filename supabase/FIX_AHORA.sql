@@ -58,10 +58,22 @@ ALTER TABLE perfiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE vehiculos DISABLE ROW LEVEL SECURITY;
 ALTER TABLE ordenes DISABLE ROW LEVEL SECURITY;
 
--- 6. Insertar usuario admin de prueba
+-- 6. Insertar perfiles para usuarios existentes en Auth
+-- IMPORTANTE: Estos IDs deben coincidir con los IDs de los usuarios en Supabase Auth
+-- Para obtener los IDs correctos:
+-- 1. Ve a Supabase > Authentication > Users
+-- 2. Copia el UUID de cada usuario
+-- 3. Reemplaza los IDs aquí con los UUIDs reales
+
+-- IDs de los usuarios reales de Supabase Auth
 INSERT INTO perfiles (id, email, nombre_completo, rol, activo) VALUES
-    (gen_random_uuid(), 'admin@gmail.com', 'Administrador', 'admin', true)
-ON CONFLICT (email) DO NOTHING;
+    ('72062fd8-9120-4a8f-b88d-38ae72ee5093', 'admin@gmail.com', 'Juan Ramirez', 'admin', true),
+    ('92b26dd4-0041-48a3-a241-f2097612c69', 'mecanico@gmail.com', 'brayan', 'mecanico', true)
+ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    nombre_completo = EXCLUDED.nombre_completo,
+    rol = EXCLUDED.rol,
+    activo = EXCLUDED.activo;
 
 -- 7. Insertar vehículos de prueba
 INSERT INTO vehiculos (patente, marca, modelo, anio, motor, color) VALUES

@@ -40,12 +40,16 @@ export default function TicketPage() {
 
             if (ordenData) {
                 setOrden(ordenData);
-                const [veh, mec] = await Promise.all([
-                    buscarVehiculoPorPatente(ordenData.patente_vehiculo),
-                    ordenData.asignado_a ? obtenerPerfilPorId(ordenData.asignado_a) : Promise.resolve(null)
-                ]);
+                
+                // Buscar vehículo completo desde Supabase por patente
+                const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
                 setVehiculo(veh);
-                setMecanico(mec);
+                
+                // Buscar mecánico asignado
+                if (ordenData.asignado_a) {
+                    const mec = await obtenerPerfilPorId(ordenData.asignado_a);
+                    setMecanico(mec);
+                }
             }
             setIsLoading(false);
         };
@@ -138,8 +142,19 @@ export default function TicketPage() {
 
             {/* Ticket Container */}
             <div ref={ticketRef} className="bg-white text-black w-[320px] p-4 shadow-xl print:shadow-none print:w-full print:p-0 font-mono text-sm leading-tight ticket-container">
-                {/* Header */}
+                {/* Header with Logo */}
                 <div className="text-center mb-4 border-b border-dashed border-black pb-4">
+                    <div className="flex justify-center mb-3">
+                        <div className="relative w-24 h-24">
+                            <Image
+                                src="/images/logo-blanco.jpg"
+                                alt="Electromecánica JR"
+                                fill
+                                className="object-contain"
+                                priority
+                            />
+                        </div>
+                    </div>
                     <h1 className="text-xl font-bold uppercase mb-1">Electromecánica</h1>
                     <h2 className="text-2xl font-bold uppercase mb-2">JR</h2>
                     <p className="text-xs">Fecha: {new Date().toLocaleString('es-CL')}</p>
@@ -159,7 +174,14 @@ export default function TicketPage() {
                         <span className="font-bold uppercase">{orden.patente_vehiculo}</span>
                         
                         <span className="font-bold">Vehículo:</span>
-                        <span className="uppercase">{vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-'}</span>
+                        <span className="uppercase">{vehiculo ? `${vehiculo.marca} ${vehiculo.modelo} ${vehiculo.anio || ''}` : 'Por definir'}</span>
+                        
+                        {vehiculo?.motor && (
+                            <>
+                                <span className="font-bold">Motor:</span>
+                                <span>{vehiculo.motor}</span>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -171,11 +193,11 @@ export default function TicketPage() {
                     </div>
                 </div>
 
-                {/* Totals */}
+                {/* Totals - Uses admin-edited total from ordenes.precio_total */}
                 <div className="mb-6">
                     <div className="flex justify-between items-center text-lg font-bold">
                         <span>TOTAL:</span>
-                        <span>${(orden.precio_total || 0).toLocaleString('es-CL')}</span>
+                        <span>${orden.precio_total ? orden.precio_total.toLocaleString('es-CL') : 'Por definir'}</span>
                     </div>
                     {orden.metodo_pago && (
                         <div className="flex justify-between items-center text-xs mt-1">

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { buscarVehiculoPorPatente, crearVehiculo, crearOrden } from '@/lib/storage-adapter';
 import { subirImagen } from '@/lib/local-storage-service';
 import { consultarPatenteGetAPI, isGetAPIConfigured } from '@/lib/getapi-service';
+import imageCompression from 'browser-image-compression';
 
 const MOCK_DB: Record<string, { marca: string; modelo: string; anio: string; motor: string }> = {
     PROFE1: { marca: 'Nissan', modelo: 'V16', anio: '2010', motor: '1.6 Twin Cam' },
@@ -62,6 +63,27 @@ function nowCL() {
         minute: '2-digit',
         second: '2-digit',
     });
+}
+
+// Función para comprimir imágenes antes de subir
+async function comprimirImagen(file: File): Promise<File> {
+    const options = {
+        maxSizeMB: 1, // Máximo 1MB
+        maxWidthOrHeight: 1920, // Máximo 1920px de ancho/alto
+        useWebWorker: true,
+        fileType: 'image/jpeg', // Convertir a JPEG para mejor compresión
+    };
+
+    try {
+        console.log(`📸 Comprimiendo imagen: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        const compressedFile = await imageCompression(file, options);
+        console.log(`✅ Imagen comprimida: ${compressedFile.name} (${(compressedFile.size / 1024 / 1024).toFixed(2)}MB)`);
+        return compressedFile;
+    } catch (error) {
+        console.error('❌ Error al comprimir imagen:', error);
+        // Si falla la compresión, retornar el archivo original
+        return file;
+    }
 }
 
 export default function RecepcionPage() {
@@ -759,7 +781,9 @@ export default function RecepcionPage() {
                             if (!files.length) return;
                             setIsUploading(true);
                             try {
-                                const uploads = await Promise.all(files.map((f) => subirImagen(f, 'ordenes')));
+                                // Comprimir imágenes antes de subir
+                                const compressedFiles = await Promise.all(files.map(comprimirImagen));
+                                const uploads = await Promise.all(compressedFiles.map((f) => subirImagen(f, 'ordenes')));
                                 const ok = uploads.filter(Boolean) as string[];
                                 setFotos((prev) => [...prev, ...ok]);
                             } finally {
@@ -779,7 +803,9 @@ export default function RecepcionPage() {
                             if (!files.length) return;
                             setIsUploading(true);
                             try {
-                                const uploads = await Promise.all(files.map((f) => subirImagen(f, 'ordenes')));
+                                // Comprimir imágenes antes de subir
+                                const compressedFiles = await Promise.all(files.map(comprimirImagen));
+                                const uploads = await Promise.all(compressedFiles.map((f) => subirImagen(f, 'ordenes')));
                                 const ok = uploads.filter(Boolean) as string[];
                                 setFotos((prev) => [...prev, ...ok]);
                             } finally {

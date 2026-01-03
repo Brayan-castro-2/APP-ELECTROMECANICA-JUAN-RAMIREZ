@@ -420,6 +420,9 @@ export default function RecepcionPage() {
             
             console.log('✅ Vehículo guardado correctamente:', vehiculoGuardado);
 
+            // Construir número completo de WhatsApp con prefijo +569
+            const whatsappCompleto = clienteWhatsapp ? `+569${clienteWhatsapp}` : undefined;
+            
             const orden = await crearOrden({
                 patente_vehiculo: p,
                 descripcion_ingreso: descripcionIngreso,
@@ -427,7 +430,7 @@ export default function RecepcionPage() {
                 estado: 'pendiente',
                 asignado_a: user.id,
                 cliente_nombre: clienteNombre || undefined,
-                cliente_telefono: clienteWhatsapp || undefined,
+                cliente_telefono: whatsappCompleto,
                 precio_total: total || undefined,
                 fotos: fotos.length ? fotos : undefined,
                 detalles_vehiculo: detallesVehiculo.trim() || undefined,
@@ -584,13 +587,21 @@ export default function RecepcionPage() {
                     </div>
                     <div>
                         <label className="text-sm font-semibold text-slate-200">WhatsApp</label>
-                        <input
-                            value={clienteWhatsapp}
-                            onChange={(e) => setClienteWhatsapp(e.target.value.replace(/[^0-9]/g, '').slice(0, 15))}
-                            inputMode="numeric"
-                            placeholder="569XXXXXXXX"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
-                        />
+                        <div className="relative mt-2">
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                                <span className="text-slate-400">+569</span>
+                            </div>
+                            <input
+                                value={clienteWhatsapp}
+                                onChange={(e) => {
+                                    const numeros = e.target.value.replace(/[^0-9]/g, '');
+                                    setClienteWhatsapp(numeros.slice(0, 8));
+                                }}
+                                inputMode="numeric"
+                                placeholder="12345678"
+                                className="w-full rounded-xl border border-slate-700 bg-slate-800/50 py-3 pl-16 pr-4 text-white"
+                            />
+                        </div>
                         <div className="mt-2 text-xs text-slate-400">Usa formato internacional sin + (ej: 56912345678).</div>
                     </div>
                 </div>

@@ -51,30 +51,33 @@ export default function AdminPage() {
 
     const loadData = async () => {
         try {
-            // Timeout de 10 segundos para evitar carga infinita
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 10000)
-            );
-
-            const dataPromise = Promise.all([
-                obtenerOrdenesHoy(),
+            console.log('🔄 Cargando datos del dashboard...');
+            
+            const [ordenes, perfs, vehs] = await Promise.all([
                 obtenerOrdenes(),
                 obtenerPerfiles(),
                 obtenerVehiculos()
             ]);
 
-            const [ordenesHoy, ordenes, perfs, vehs] = await Promise.race([
-                dataPromise,
-                timeoutPromise
-            ]) as [OrdenDB[], OrdenDB[], PerfilDB[], VehiculoDB[]];
+            console.log('✅ Datos cargados:', { ordenes: ordenes?.length, perfiles: perfs?.length, vehiculos: vehs?.length });
 
-            setTodaysOrders(ordenesHoy || []);
+            // Filtrar órdenes de hoy manualmente
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const ordenesHoy = (ordenes || []).filter(o => {
+                const fechaOrden = new Date(o.fecha_ingreso);
+                fechaOrden.setHours(0, 0, 0, 0);
+                return fechaOrden.getTime() === hoy.getTime();
+            });
+
+            console.log('📊 Órdenes de hoy:', ordenesHoy.length);
+
+            setTodaysOrders(ordenesHoy);
             setAllOrders(ordenes || []);
             setPerfiles(perfs || []);
             setVehiculos(vehs || []);
         } catch (e: any) {
-            console.error('Error cargando datos:', e);
-            // Establecer arrays vacíos en caso de error
+            console.error('❌ Error cargando datos:', e);
             setTodaysOrders([]);
             setAllOrders([]);
             setPerfiles([]);

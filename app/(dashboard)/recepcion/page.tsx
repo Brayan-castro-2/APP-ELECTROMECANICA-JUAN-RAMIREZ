@@ -81,7 +81,7 @@ export default function RecepcionPage() {
     const [kmActual, setKmActual] = useState('');
     const [kmNuevo, setKmNuevo] = useState('');
     const [kmServiceIndex, setKmServiceIndex] = useState<number | null>(null);
-    const [vehiculoLocked, setVehiculoLocked] = useState(true);
+    const [vehiculoLocked, setVehiculoLocked] = useState(false);
     const [estadoBusqueda, setEstadoBusqueda] = useState('');
     const [isBuscando, setIsBuscando] = useState(false);
 
@@ -148,7 +148,7 @@ export default function RecepcionPage() {
             setModelo('');
             setAnio('');
             setMotor('');
-            setVehiculoLocked(true);
+            setVehiculoLocked(false);
             return;
         }
 
@@ -502,8 +502,8 @@ export default function RecepcionPage() {
                         <input
                             value={marca}
                             onChange={(e) => setMarca(e.target.value)}
-                            readOnly={vehiculoLocked}
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                            placeholder="Ej: Toyota, Chevrolet"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
                         />
                     </div>
                     <div>
@@ -511,8 +511,8 @@ export default function RecepcionPage() {
                         <input
                             value={modelo}
                             onChange={(e) => setModelo(e.target.value)}
-                            readOnly={vehiculoLocked}
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                            placeholder="Ej: Corolla, Sail"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
                         />
                     </div>
                     <div>
@@ -520,9 +520,8 @@ export default function RecepcionPage() {
                         <input
                             value={anio}
                             onChange={(e) => setAnio(e.target.value)}
-                            readOnly={vehiculoLocked}
-                            inputMode="numeric"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                            placeholder="Ej: 2020"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
                         />
                     </div>
                     <div>
@@ -530,8 +529,8 @@ export default function RecepcionPage() {
                         <input
                             value={motor}
                             onChange={(e) => setMotor(e.target.value)}
-                            readOnly={vehiculoLocked}
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white"
+                            placeholder="Ej: 1.4, 1.6 Twin Cam"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
                         />
                     </div>
                 </div>

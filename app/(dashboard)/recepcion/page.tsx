@@ -212,11 +212,12 @@ export default function RecepcionPage() {
                     // Si hay error de API (límite, key inválida, etc), mostrar mensaje pero continuar con fallback
                     console.error(`[Búsqueda] ⚠️ Error en GetAPI:`, error);
                     if (error instanceof Error) {
-                        setEstadoBusqueda(`⚠️ ${error.message}. Intentando con datos locales...`);
+                        setEstadoBusqueda(`⚠️ GetAPI no disponible. Completa los datos manualmente.`);
                     }
                 }
             } else {
-                console.warn(`[Búsqueda] ⚠️ GetAPI no configurada. Crea archivo .env.local con NEXT_PUBLIC_GETAPI_KEY`);
+                console.warn(`[Búsqueda] ⚠️ GetAPI no configurada.`);
+                setEstadoBusqueda(`⚠️ GetAPI no configurada. Completa los datos manualmente.`);
             }
 
             // 3. Fallback a datos mock (para testing)

@@ -58,13 +58,16 @@ export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVeh
                 throw new Error('Límite de consultas excedido. Intenta nuevamente en unos minutos.');
             }
 
-            if (response.status === 401) {
-                console.error('⚠️ API Key inválida o expirada');
-                throw new Error('API Key inválida o expirada. Verifica tu configuración.');
+            if (response.status === 401 || response.status === 403) {
+                console.error('⚠️ API Key inválida, expirada o sin créditos');
+                // No lanzar error, solo retornar null para permitir entrada manual
+                return null;
             }
 
             const errorData = await response.json().catch(() => null) as GetAPIError | null;
-            throw new Error(errorData?.error || `Error ${response.status} al consultar GetAPI`);
+            console.warn(`⚠️ Error ${response.status} en GetAPI:`, errorData?.error);
+            // Retornar null en lugar de lanzar error para permitir entrada manual
+            return null;
         }
 
         const data = await response.json() as GetAPIVehicleResponse;

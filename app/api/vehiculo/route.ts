@@ -52,10 +52,10 @@ export async function GET(request: NextRequest) {
                 );
             }
 
-            if (response.status === 401) {
-                console.error('⚠️ [API Route] API Key inválida');
+            if (response.status === 401 || response.status === 403) {
+                console.error('⚠️ [API Route] API Key inválida o sin permisos');
                 return NextResponse.json(
-                    { error: 'API Key inválida' },
+                    { error: 'API Key inválida, expirada o sin créditos' },
                     { status: 401 }
                 );
             }

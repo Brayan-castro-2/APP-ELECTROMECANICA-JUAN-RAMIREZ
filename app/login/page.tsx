@@ -7,10 +7,10 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
+import { AlertCircle, Loader2, User, Lock } from 'lucide-react';
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +23,8 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
+            // Convertir username a email agregando @taller.cl
+            const email = `${username.toLowerCase().trim()}@taller.cl`;
             const result = await login(email, password);
             if (result.success) {
                 router.push('/');
@@ -67,21 +69,21 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        {/* Email Field */}
+                        {/* Username Field */}
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-gray-300 text-sm font-medium">
-                                Correo Electrónico
+                            <Label htmlFor="username" className="text-gray-300 text-sm font-medium">
+                                Usuario
                             </Label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="correo@ejemplo.com"
+                                    id="username"
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="rodrigo"
                                     className="h-14 pl-12 bg-[#1a1a1a] border-[#333333] text-white placeholder:text-gray-500 rounded-xl text-base"
-                                    autoComplete="email"
+                                    autoComplete="username"
                                     autoFocus
                                     tabIndex={1}
                                 />
@@ -127,7 +129,7 @@ export default function LoginPage() {
 
                         {/* Help Text */}
                         <p className="text-center text-sm text-gray-500 mt-6">
-                            Usa las credenciales proporcionadas por el administrador
+                            Ingresa solo tu nombre de usuario (ej: rodrigo, juan, francisco, javier)
                         </p>
                     </form>
                 </div>

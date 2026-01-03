@@ -39,10 +39,10 @@ export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVeh
         
         console.log(`🔍 Consultando patente ${patenteNormalizada} en GetAPI...`);
         
-        const response = await fetch(`${GETAPI_BASE_URL}/${patenteNormalizada}`, {
+        // Usar nuestra API route para evitar problemas de CORS
+        const response = await fetch(`/api/vehiculo?patente=${patenteNormalizada}`, {
             method: 'GET',
             headers: {
-                'X-Api-Key': apiKey,
                 'Content-Type': 'application/json',
             },
         });
@@ -64,7 +64,7 @@ export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVeh
             }
 
             const errorData = await response.json().catch(() => null) as GetAPIError | null;
-            throw new Error(errorData?.message || `Error ${response.status} al consultar GetAPI`);
+            throw new Error(errorData?.error || `Error ${response.status} al consultar GetAPI`);
         }
 
         const data = await response.json() as GetAPIVehicleResponse;

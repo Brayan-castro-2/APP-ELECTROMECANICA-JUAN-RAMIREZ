@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
     loginConCredenciales, 
     logout as logoutService, 
@@ -8,6 +9,9 @@ import {
     inicializarLocalStorage,
     type PerfilDB 
 } from '@/lib/storage-adapter';
+import { ORDERS_QUERY_KEY } from '@/hooks/use-orders';
+import { USERS_QUERY_KEY } from '@/hooks/use-users';
+import { obtenerOrdenes, obtenerPerfiles } from '@/lib/storage-adapter';
 
 // Usuario del contexto
 export interface AuthUser {
@@ -30,6 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
 
     // Inicializar sesión al cargar
     useEffect(() => {
@@ -84,6 +89,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             setUser(authUser);
             console.log('Login completado:', authUser.name);
+
+            // Prefetch de datos en background para navegación instantánea
+            console.log('🚀 Precargando datos en background...');
+            queryClient.prefetchQuery({
+                queryKey: ORDERS_QUERY_KEY,
+                queryFn: obtenerOrdenes,
+            });
+            queryClient.prefetchQuery({
+                queryKey: USERS_QUERY_KEY,
+                queryFn: obtenerPerfiles,
+            });
+            console.log('✅ Prefetch iniciado');
 
             return { success: true };
         } catch (error: any) {

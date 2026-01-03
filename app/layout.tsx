@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/auth-context'
+import { QueryProvider } from '@/contexts/query-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -53,9 +54,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Electromecánica JR" />
       </head>
       <body className={inter.className}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   )

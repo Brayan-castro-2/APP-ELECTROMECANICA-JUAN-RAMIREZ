@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { obtenerOrdenes, obtenerPerfiles, obtenerVehiculos, type OrdenDB, type PerfilDB, type VehiculoDB } from '@/lib/storage-adapter';
+import { obtenerPerfiles, obtenerVehiculos, type OrdenDB, type PerfilDB, type VehiculoDB } from '@/lib/storage-adapter';
+import { useOrders } from '@/hooks/use-orders';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,27 +27,27 @@ import { Search, FileText, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OrdenesPage() {
-    const [orders, setOrders] = useState<OrdenDB[]>([]);
+    const { data: orders = [], isLoading: isLoadingOrders } = useOrders();
     const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingOther, setIsLoadingOther] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
-            const [ordenes, perfs, vehs] = await Promise.all([
-                obtenerOrdenes(),
+            const [perfs, vehs] = await Promise.all([
                 obtenerPerfiles(),
                 obtenerVehiculos()
             ]);
-            setOrders(ordenes);
             setPerfiles(perfs);
             setVehiculos(vehs);
-            setIsLoading(false);
+            setIsLoadingOther(false);
         };
         loadData();
     }, []);
+
+    const isLoading = isLoadingOrders || isLoadingOther;
 
     const getPerfilNombre = (id: string) => {
         const perfil = perfiles.find(p => p.id === id);

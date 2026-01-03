@@ -376,14 +376,17 @@ export default function RecepcionPage() {
         try {
             const existingVeh = await buscarVehiculoPorPatente(p);
             if (!existingVeh) {
-                await crearVehiculo({
+                console.log('🚗 Creando nuevo vehículo:', { patente: p, marca, modelo, anio, motor });
+                const nuevoVeh = await crearVehiculo({
                     patente: p,
                     marca,
                     modelo,
                     anio,
+                    motor,
                     color: '-',
                     cliente_id: null,
                 });
+                console.log('✅ Vehículo creado:', nuevoVeh);
             }
 
             const orden = await crearOrden({

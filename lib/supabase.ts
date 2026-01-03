@@ -11,6 +11,7 @@ export interface VehiculoDB {
     marca: string;
     modelo: string;
     anio: string;
+    motor?: string;
     color: string;
     cliente_id: number | null;
     fecha_creacion: string;

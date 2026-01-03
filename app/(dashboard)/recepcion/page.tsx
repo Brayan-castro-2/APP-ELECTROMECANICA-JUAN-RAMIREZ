@@ -384,16 +384,30 @@ export default function RecepcionPage() {
 
         const descripcionIngreso = [`Motor: ${motor}`, '', 'Servicios:', detalleServicios].join('\n');
 
+        // Validar campos obligatorios del vehículo
+        if (!marca || marca.trim() === '' || marca === 'Por definir') {
+            alert('Por favor ingresa la Marca del vehículo.');
+            return;
+        }
+        if (!modelo || modelo.trim() === '' || modelo === 'Por definir') {
+            alert('Por favor ingresa el Modelo del vehículo.');
+            return;
+        }
+        if (!anio || anio.trim() === '') {
+            alert('Por favor ingresa el Año del vehículo.');
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             // SIEMPRE guardar/actualizar el vehículo con los datos del formulario
             console.log('🚗 Guardando vehículo con datos:', { patente: p, marca, modelo, anio, motor });
             const vehiculoGuardado = await crearVehiculo({
                 patente: p,
-                marca,
-                modelo,
-                anio,
-                motor,
+                marca: marca.trim(),
+                modelo: modelo.trim(),
+                anio: anio.trim(),
+                motor: motor?.trim() || '',
                 color: '-',
                 cliente_id: null,
             });

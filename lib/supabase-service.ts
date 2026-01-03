@@ -251,6 +251,24 @@ export async function actualizarOrden(
     return data;
 }
 
+// Eliminar orden
+export async function eliminarOrden(id: number): Promise<boolean> {
+    console.log(`🗑️ Eliminando orden ${id} de Supabase`);
+    
+    const { error } = await supabase
+        .from('ordenes')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('❌ Error al eliminar orden:', error);
+        return false;
+    }
+
+    console.log('✅ Orden eliminada de Supabase');
+    return true;
+}
+
 // ============ PERFILES/USUARIOS ============
 
 // Obtener todos los perfiles

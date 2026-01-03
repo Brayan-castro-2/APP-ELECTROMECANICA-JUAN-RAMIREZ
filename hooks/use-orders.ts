@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { obtenerOrdenes } from '@/lib/storage-adapter';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { obtenerOrdenes, eliminarOrden, actualizarOrden } from '@/lib/storage-adapter';
 import { OrdenDB } from '@/lib/supabase';
 
 export const ORDERS_QUERY_KEY = ['orders'];
@@ -29,4 +29,27 @@ export function useInvalidateOrders() {
     return () => {
         queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
     };
+}
+
+export function useDeleteOrder() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: (orderId: number) => eliminarOrden(orderId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
+        },
+    });
+}
+
+export function useUpdateOrder() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: ({ id, updates }: { id: number; updates: Partial<Omit<OrdenDB, 'id' | 'fecha_ingreso'>> }) => 
+            actualizarOrden(id, updates),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
+        },
+    });
 }

@@ -101,6 +101,15 @@ export async function actualizarOrden(
     return localService.actualizarOrden(id, updates);
 }
 
+export async function eliminarOrden(id: number): Promise<boolean> {
+    if (isSupabase()) {
+        console.log('🔵 Usando Supabase para eliminar orden');
+        return supabaseService.eliminarOrden(id);
+    }
+    console.log('🟡 Usando localStorage para eliminar orden');
+    return localService.eliminarOrden(id);
+}
+
 // ============ PERFILES/USUARIOS ============
 
 export async function obtenerPerfiles(): Promise<PerfilDB[]> {

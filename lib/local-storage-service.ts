@@ -253,6 +253,20 @@ export async function actualizarOrden(
     return ordenes[index];
 }
 
+export async function eliminarOrden(id: number): Promise<boolean> {
+    const ordenes = getFromStorage<OrdenDB[]>(KEYS.ORDENES, []);
+    const filtered = ordenes.filter(o => o.id !== id);
+    
+    if (filtered.length === ordenes.length) {
+        console.error('Orden no encontrada:', id);
+        return false;
+    }
+    
+    saveToStorage(KEYS.ORDENES, filtered);
+    console.log('✅ Orden eliminada:', id);
+    return true;
+}
+
 // ============ PERFILES/USUARIOS ============
 
 export async function obtenerPerfiles(): Promise<PerfilDB[]> {

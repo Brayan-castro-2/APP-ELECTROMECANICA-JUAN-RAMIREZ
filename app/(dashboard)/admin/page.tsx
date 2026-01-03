@@ -22,7 +22,9 @@ import {
     RefreshCw,
     ChevronRight,
     TrendingUp,
-    Loader2
+    Loader2,
+    Users,
+    DollarSign
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -103,6 +105,24 @@ export default function AdminPage() {
         inProgress: allOrders.filter(o => o.estado === 'en_progreso').length,
         completed: allOrders.filter(o => o.estado === 'completada').length,
     }), [todaysOrders, allOrders]);
+
+    // Calcular rendimiento de mecánicos
+    const mechanicPerformance = useMemo(() => {
+        const mechanics = perfiles.filter(p => p.rol === 'mecanico' || p.rol === 'admin');
+        
+        return mechanics.map(mechanic => {
+            const assignedOrders = allOrders.filter(o => o.asignado_a === mechanic.id);
+            const totalRevenue = assignedOrders.reduce((acc, o) => acc + (o.precio_total || 0), 0);
+            
+            return {
+                id: mechanic.id,
+                name: mechanic.nombre_completo,
+                ordersCount: assignedOrders.length,
+                totalRevenue,
+                completedCount: assignedOrders.filter(o => o.estado === 'completada').length,
+            };
+        }).sort((a, b) => b.ordersCount - a.ordersCount);
+    }, [allOrders, perfiles]);
 
     const getPerfilNombre = (id: string) => {
         const perfil = perfiles.find(p => p.id === id);
@@ -270,6 +290,70 @@ export default function AdminPage() {
                                 </Link>
                             );
                         })}
+                    </div>
+                )}
+            </div>
+
+            {/* Mechanic Performance */}
+            <div>
+                <div className="flex items-center gap-3 mb-4">
+                    <Users className="w-5 h-5 text-[#0066FF]" />
+                    <h2 className="text-lg font-semibold text-white">Rendimiento de Mecánicos</h2>
+                </div>
+
+                {isLoading ? (
+                    <div className="space-y-3">
+                        {[1, 2].map((i) => (
+                            <div key={i} className="bg-[#1a1a1a] rounded-xl p-4 animate-pulse">
+                                <div className="flex items-center justify-between">
+                                    <div className="w-32 h-4 bg-[#333] rounded" />
+                                    <div className="w-16 h-4 bg-[#333] rounded" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : mechanicPerformance.length === 0 ? (
+                    <Card className="bg-[#1a1a1a] border-[#333333]">
+                        <CardContent className="py-8 text-center">
+                            <Users className="w-10 h-10 mx-auto mb-2 text-gray-600" />
+                            <p className="text-gray-400 text-sm">No hay datos de mecánicos</p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="space-y-3">
+                        {mechanicPerformance.map((mechanic, index) => (
+                            <Card key={mechanic.id} className="bg-[#1a1a1a] border-[#333333]">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                                index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                                                index === 1 ? 'bg-gray-400/20 text-gray-300' :
+                                                index === 2 ? 'bg-orange-500/20 text-orange-400' :
+                                                'bg-[#333333] text-gray-400'
+                                            }`}>
+                                                #{index + 1}
+                                            </div>
+                                            <div>
+                                                <p className="text-white font-medium">{mechanic.name}</p>
+                                                <p className="text-xs text-gray-400">{mechanic.completedCount} completadas</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-white font-bold">{mechanic.ordersCount}</p>
+                                            <p className="text-xs text-gray-400">órdenes</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <DollarSign className="w-4 h-4 text-green-400" />
+                                        <span className="text-green-400 font-semibold">
+                                            ${mechanic.totalRevenue.toLocaleString('es-CL')}
+                                        </span>
+                                        <span className="text-gray-500">generados</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                     </div>
                 )}
             </div>

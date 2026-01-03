@@ -160,13 +160,25 @@ export default function RecepcionPage() {
             console.log(`[Búsqueda] Paso 1: Buscando ${p} en localStorage...`);
             const vehiculoLocal = await buscarVehiculoPorPatente(p);
             if (vehiculoLocal) {
-                console.log(`[Búsqueda] ✅ Encontrado en localStorage:`, vehiculoLocal);
-                setMarca(vehiculoLocal.marca);
-                setModelo(vehiculoLocal.modelo);
-                setAnio(vehiculoLocal.anio);
-                setMotor(vehiculoLocal.motor || '');
+                console.log(`[Búsqueda] ✅ Encontrado en BD:`, vehiculoLocal);
+                
+                // Solo sobrescribir si los datos de la BD son válidos (no "Por definir")
+                const marcaValida = vehiculoLocal.marca && vehiculoLocal.marca !== 'Por definir';
+                const modeloValido = vehiculoLocal.modelo && vehiculoLocal.modelo !== 'Por definir';
+                
+                if (marcaValida) setMarca(vehiculoLocal.marca);
+                if (modeloValido) setModelo(vehiculoLocal.modelo);
+                if (vehiculoLocal.anio && vehiculoLocal.anio !== '2026') setAnio(vehiculoLocal.anio);
+                if (vehiculoLocal.motor) setMotor(vehiculoLocal.motor);
+                
                 setVehiculoLocked(false);
-                setEstadoBusqueda(`✅ Vehículo encontrado en registros: ${vehiculoLocal.marca} ${vehiculoLocal.modelo} (${vehiculoLocal.anio})`);
+                
+                if (marcaValida && modeloValido) {
+                    setEstadoBusqueda(`✅ Vehículo encontrado: ${vehiculoLocal.marca} ${vehiculoLocal.modelo} (${vehiculoLocal.anio})`);
+                } else {
+                    setEstadoBusqueda(`⚠️ Vehículo encontrado pero sin datos completos. Completa manualmente.`);
+                }
+                
                 setIsBuscando(false);
                 return;
             }
@@ -374,20 +386,25 @@ export default function RecepcionPage() {
 
         setIsSubmitting(true);
         try {
-            const existingVeh = await buscarVehiculoPorPatente(p);
-            if (!existingVeh) {
-                console.log('🚗 Creando nuevo vehículo:', { patente: p, marca, modelo, anio, motor });
-                const nuevoVeh = await crearVehiculo({
-                    patente: p,
-                    marca,
-                    modelo,
-                    anio,
-                    motor,
-                    color: '-',
-                    cliente_id: null,
-                });
-                console.log('✅ Vehículo creado:', nuevoVeh);
+            // SIEMPRE guardar/actualizar el vehículo con los datos del formulario
+            console.log('🚗 Guardando vehículo con datos:', { patente: p, marca, modelo, anio, motor });
+            const vehiculoGuardado = await crearVehiculo({
+                patente: p,
+                marca,
+                modelo,
+                anio,
+                motor,
+                color: '-',
+                cliente_id: null,
+            });
+            
+            if (!vehiculoGuardado) {
+                alert('Error al guardar el vehículo. Intenta de nuevo.');
+                setIsSubmitting(false);
+                return;
             }
+            
+            console.log('✅ Vehículo guardado correctamente:', vehiculoGuardado);
 
             const orden = await crearOrden({
                 patente_vehiculo: p,

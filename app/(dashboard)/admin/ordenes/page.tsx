@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { obtenerPerfiles, obtenerVehiculos, type OrdenDB, type PerfilDB, type VehiculoDB } from '@/lib/storage-adapter';
-import { useOrders } from '@/hooks/use-orders';
+import { useOrders, useDeleteOrder } from '@/hooks/use-orders';
+import { useAuth } from '@/contexts/auth-context';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,16 +24,21 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Search, FileText, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, FileText, ChevronRight, Loader2, Trash2, Edit } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OrdenesPage() {
+    const { user } = useAuth();
     const { data: orders = [], isLoading: isLoadingOrders } = useOrders();
+    const deleteOrder = useDeleteOrder();
     const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [isLoadingOther, setIsLoadingOther] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+
+    const isAdmin = user?.role === 'admin';
 
     useEffect(() => {
         const loadData = async () => {
@@ -70,6 +76,16 @@ export default function OrdenesPage() {
 
         return matchesSearch && matchesStatus;
     });
+
+    const handleDeleteOrder = async (orderId: number) => {
+        try {
+            await deleteOrder.mutateAsync(orderId);
+            setDeleteConfirm(null);
+        } catch (error) {
+            console.error('Error al eliminar orden:', error);
+            alert('Error al eliminar la orden');
+        }
+    };
 
     const getStatusBadge = (status: string) => {
         const config: Record<string, { class: string; label: string }> = {
@@ -177,11 +193,45 @@ export default function OrdenesPage() {
                                                 {getStatusBadge(order.estado)}
                                             </TableCell>
                                             <TableCell>
-                                                <Link href={`/admin/ordenes/clean?id=${order.id}`}>
-                                                    <Button size="sm" variant="ghost" className="text-slate-300 hover:text-white">
-                                                        <ChevronRight className="w-4 h-4" />
-                                                    </Button>
-                                                </Link>
+                                                <div className="flex items-center gap-2">
+                                                    <Link href={`/admin/ordenes/clean?id=${order.id}`}>
+                                                        <Button size="sm" variant="ghost" className="text-blue-400 hover:text-blue-300">
+                                                            <Edit className="w-4 h-4" />
+                                                        </Button>
+                                                    </Link>
+                                                    {isAdmin && (
+                                                        deleteConfirm === order.id ? (
+                                                            <div className="flex gap-1">
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="ghost" 
+                                                                    className="text-red-400 hover:text-red-300"
+                                                                    onClick={() => handleDeleteOrder(order.id)}
+                                                                    disabled={deleteOrder.isPending}
+                                                                >
+                                                                    Confirmar
+                                                                </Button>
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="ghost" 
+                                                                    className="text-slate-400 hover:text-slate-300"
+                                                                    onClick={() => setDeleteConfirm(null)}
+                                                                >
+                                                                    Cancelar
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant="ghost" 
+                                                                className="text-red-400 hover:text-red-300"
+                                                                onClick={() => setDeleteConfirm(order.id)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        )
+                                                    )}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     );

@@ -7,7 +7,7 @@
 -- IMPORTANTE: Estos usuarios se crean en auth.users (sistema de autenticación)
 -- Las contraseñas están hasheadas con bcrypt
 
--- 1. Rodrigo (Pass: 1986)
+-- 1. Rodrigo (Pass: 1986) - ADMIN
 INSERT INTO auth.users (
     instance_id,
     id,
@@ -34,7 +34,7 @@ VALUES (
     crypt('1986', gen_salt('bf')),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Rodrigo"}',
+    '{"nombre":"Rodrigo","rol":"admin"}',
     NOW(),
     NOW(),
     '',
@@ -43,7 +43,7 @@ VALUES (
     ''
 );
 
--- 2. Juan (Pass: 1989)
+-- 2. Juan (Pass: 1989) - ADMIN
 INSERT INTO auth.users (
     instance_id,
     id,
@@ -70,7 +70,7 @@ VALUES (
     crypt('1989', gen_salt('bf')),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Juan"}',
+    '{"nombre":"Juan","rol":"admin"}',
     NOW(),
     NOW(),
     '',
@@ -79,7 +79,7 @@ VALUES (
     ''
 );
 
--- 3. Francisco (Pass: 2001)
+-- 3. Francisco (Pass: 2001) - MECANICO
 INSERT INTO auth.users (
     instance_id,
     id,
@@ -106,7 +106,7 @@ VALUES (
     crypt('2001', gen_salt('bf')),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Francisco"}',
+    '{"nombre":"Francisco","rol":"mecanico"}',
     NOW(),
     NOW(),
     '',
@@ -115,7 +115,7 @@ VALUES (
     ''
 );
 
--- 4. Javier (Pass: 2280)
+-- 4. Javier (Pass: 2280) - MECANICO
 INSERT INTO auth.users (
     instance_id,
     id,
@@ -142,7 +142,7 @@ VALUES (
     crypt('2280', gen_salt('bf')),
     NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"nombre":"Javier"}',
+    '{"nombre":"Javier","rol":"mecanico"}',
     NOW(),
     NOW(),
     '',
@@ -174,11 +174,12 @@ INSERT INTO public.perfiles (id, nombre, rol, email)
 SELECT 
     id,
     raw_user_meta_data->>'nombre',
-    'mecanico',
+    COALESCE(raw_user_meta_data->>'rol', 'mecanico'),
     email
 FROM auth.users
 WHERE email LIKE '%@taller.cl'
 ON CONFLICT (id) DO UPDATE
 SET 
     nombre = EXCLUDED.nombre,
+    rol = EXCLUDED.rol,
     email = EXCLUDED.email;

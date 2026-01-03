@@ -98,6 +98,9 @@ export default function RecepcionPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+    // Ref para auto-focus en KM Actual
+    const kmActualInputRef = useRef<HTMLInputElement>(null);
+
     const descRefs = useRef<Array<HTMLInputElement | null>>([]);
     const precioRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -262,16 +265,22 @@ export default function RecepcionPage() {
             if (emptyIndex >= 0) {
                 const next = prev.map((s, i) => (i === emptyIndex ? { ...s, descripcion: kmDesc } : s));
                 setKmServiceIndex(emptyIndex);
-                setFocusTarget({ index: emptyIndex, field: 'precio' });
                 return next;
             }
 
             const next = [...prev, { descripcion: kmDesc, precio: '' }];
             const idx = next.length - 1;
             setKmServiceIndex(idx);
-            setFocusTarget({ index: idx, field: 'precio' });
             return next;
         });
+
+        // Auto-focus en KM Actual después de que el DOM se actualice
+        setTimeout(() => {
+            if (kmActualInputRef.current) {
+                kmActualInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                kmActualInputRef.current.focus();
+            }
+        }, 100);
     };
 
     const desactivarServicioKm = () => {
@@ -409,7 +418,6 @@ export default function RecepcionPage() {
                 anio: anio.trim(),
                 motor: motor?.trim() || '',
                 color: '-',
-                cliente_id: null,
             });
             
             if (!vehiculoGuardado) {
@@ -639,6 +647,7 @@ export default function RecepcionPage() {
                         <div>
                             <label className="text-sm font-semibold text-slate-200">KM actual</label>
                             <input
+                                ref={kmActualInputRef}
                                 value={formatMilesConPunto(kmActual)}
                                 onChange={(e) => setKmActual(e.target.value.replace(/[^0-9]/g, '').slice(0, 7))}
                                 inputMode="numeric"

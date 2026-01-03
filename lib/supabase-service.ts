@@ -26,7 +26,7 @@ export async function buscarVehiculoPorPatente(patente: string): Promise<Vehicul
 export async function crearVehiculo(vehiculo: Omit<VehiculoDB, 'fecha_creacion'>): Promise<VehiculoDB | null> {
     const patenteUpper = vehiculo.patente.toUpperCase();
     
-    // Preparar datos limpios para Supabase
+    // Preparar datos limpios para Supabase (sin cliente_id porque no existe en la tabla)
     const vehiculoData = {
         patente: patenteUpper,
         marca: vehiculo.marca,
@@ -34,7 +34,6 @@ export async function crearVehiculo(vehiculo: Omit<VehiculoDB, 'fecha_creacion'>
         anio: vehiculo.anio,
         motor: vehiculo.motor || null,
         color: vehiculo.color || '-',
-        cliente_id: vehiculo.cliente_id || null,
     };
     
     console.log('📤 Enviando a Supabase:', vehiculoData);

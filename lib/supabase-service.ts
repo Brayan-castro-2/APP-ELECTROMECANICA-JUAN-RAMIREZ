@@ -22,22 +22,29 @@ export async function buscarVehiculoPorPatente(patente: string): Promise<Vehicul
     return data;
 }
 
-// Crear nuevo vehículo
+// Crear nuevo vehículo (o actualizar si ya existe)
 export async function crearVehiculo(vehiculo: Omit<VehiculoDB, 'fecha_creacion'>): Promise<VehiculoDB | null> {
+    const patenteUpper = vehiculo.patente.toUpperCase();
+    
+    // Usar upsert para crear o actualizar
     const { data, error } = await supabase
         .from('vehiculos')
-        .insert([{
+        .upsert([{
             ...vehiculo,
-            patente: vehiculo.patente.toUpperCase(),
-        }])
+            patente: patenteUpper,
+        }], {
+            onConflict: 'patente',
+            ignoreDuplicates: false
+        })
         .select()
         .single();
 
     if (error) {
-        console.error('Error al crear vehículo:', error);
+        console.error('❌ Error al crear/actualizar vehículo:', error);
         return null;
     }
 
+    console.log('✅ Vehículo guardado:', data);
     return data;
 }
 

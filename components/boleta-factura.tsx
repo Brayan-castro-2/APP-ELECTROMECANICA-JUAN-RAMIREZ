@@ -120,7 +120,7 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
                     <div className="flex justify-between items-start">
                         <div className="flex items-center gap-4">
                             <img 
-                                src="/imagenes/fondoboleta.jpg" 
+                                src="/imagenes/fondoboleta.png" 
                                 alt="Logo Electromecánica JR" 
                                 className="h-20 w-auto object-contain"
                             />

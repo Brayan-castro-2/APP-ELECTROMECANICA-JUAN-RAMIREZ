@@ -86,9 +86,9 @@ export default function PrintOrdenPage() {
                 <div className="border-b-2 border-gray-800 pb-6 mb-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="relative w-20 h-20">
+                            <div className="relative w-32 h-32">
                                 <Image
-                                    src="/images/logo-negro.jpg"
+                                    src="/images/LOGO ticket(fondo blanco).png"
                                     alt="Electromecánica JR"
                                     fill
                                     className="object-contain"

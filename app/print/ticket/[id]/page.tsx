@@ -145,9 +145,9 @@ export default function TicketPage() {
                 {/* Header with Logo */}
                 <div className="text-center mb-4 border-b border-dashed border-black pb-4">
                     <div className="flex justify-center mb-3">
-                        <div className="relative w-24 h-24">
+                        <div className="relative w-40 h-40">
                             <Image
-                                src="/images/logo-blanco.jpg"
+                                src="/images/LOGO ticket(fondo blanco).png"
                                 alt="Electromecánica JR"
                                 fill
                                 className="object-contain"

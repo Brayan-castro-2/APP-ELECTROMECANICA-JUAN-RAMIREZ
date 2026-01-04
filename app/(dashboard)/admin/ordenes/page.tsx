@@ -122,7 +122,9 @@ export default function OrdenesPage() {
                 <title>Órdenes de Trabajo</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 20px; }
-                    h1 { color: #333; }
+                    .header { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+                    .header img { height: 60px; }
+                    .header h1 { color: #333; margin: 0; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                     th { background-color: #0066FF; color: white; }
@@ -130,8 +132,13 @@ export default function OrdenesPage() {
                 </style>
             </head>
             <body>
-                <h1>Órdenes de Trabajo - Electromecánica JR</h1>
-                <p>Total de órdenes: ${printContent.length}</p>
+                <div class="header">
+                    <img src="/images/LOGO ticket(fondo blanco).png" alt="Logo Electromecánica JR" style="height: 120px;" />
+                    <div>
+                        <h1>Órdenes de Trabajo - Electromecánica JR</h1>
+                        <p>Total de órdenes: ${printContent.length}</p>
+                    </div>
+                </div>
                 <table>
                     <thead>
                         <tr>

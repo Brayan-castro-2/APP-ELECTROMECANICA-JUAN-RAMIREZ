@@ -8,10 +8,9 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings, WifiOff } from 'lucide-react';
+import { LogOut, WifiOff } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export function Header() {
@@ -117,15 +116,6 @@ export function Header() {
                                 <p className="text-sm font-medium text-white">{user.name}</p>
                                 <p className="text-xs text-gray-400">{user.email}</p>
                             </div>
-                            <DropdownMenuItem className="text-gray-300 focus:bg-[#242424] focus:text-white cursor-pointer">
-                                <User className="mr-3 h-4 w-4 text-gray-400" />
-                                Mi Perfil
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-gray-300 focus:bg-[#242424] focus:text-white cursor-pointer">
-                                <Settings className="mr-3 h-4 w-4 text-gray-400" />
-                                Configuración
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-[#333333]" />
                             <DropdownMenuItem
                                 onClick={handleLogout}
                                 className="text-red-400 focus:bg-red-500/10 focus:text-red-300 cursor-pointer"

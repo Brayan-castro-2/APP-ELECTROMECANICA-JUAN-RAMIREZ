@@ -110,96 +110,14 @@ export default function UsuariosPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#0066FF] rounded-xl flex items-center justify-center">
-                        <Users className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-white">Usuarios</h1>
-                        <p className="text-sm text-gray-400">Gestión de mecánicos y administradores</p>
-                    </div>
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#0066FF] rounded-xl flex items-center justify-center">
+                    <Users className="w-5 h-5 text-white" />
                 </div>
-
-                <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-[#0066FF] hover:bg-[#0052CC] text-white rounded-xl touch-target">
-                            <UserPlus className="w-4 h-4 mr-2" />
-                            <span className="hidden sm:inline">Nuevo Usuario</span>
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-[#1a1a1a] border-[#333333] text-white">
-                        <DialogHeader>
-                            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-                            <DialogDescription className="text-gray-400">
-                                Ingresa los datos del nuevo mecánico o administrador
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            {createError && (
-                                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                                    {createError}
-                                </div>
-                            )}
-                            <div className="space-y-2">
-                                <Label className="text-gray-300">Nombre Completo</Label>
-                                <Input
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
-                                    placeholder="Juan Pérez"
-                                    className="bg-[#121212] border-[#333333] text-white rounded-xl h-12"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-gray-300">Correo Electrónico</Label>
-                                <Input
-                                    type="email"
-                                    value={newEmail}
-                                    onChange={(e) => setNewEmail(e.target.value)}
-                                    placeholder="juan@taller.com"
-                                    className="bg-[#121212] border-[#333333] text-white rounded-xl h-12"
-                                    autoComplete="off"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-gray-300">Contraseña</Label>
-                                <Input
-                                    type="password"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    placeholder="Mínimo 6 caracteres"
-                                    className="bg-[#121212] border-[#333333] text-white rounded-xl h-12"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-gray-300">Rol</Label>
-                                <Select value={newRole} onValueChange={(v) => setNewRole(v as 'mecanico' | 'admin')}>
-                                    <SelectTrigger className="bg-[#121212] border-[#333333] text-white rounded-xl h-12">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-[#1a1a1a] border-[#333333]">
-                                        <SelectItem value="mecanico" className="text-gray-200">Mecánico</SelectItem>
-                                        <SelectItem value="admin" className="text-gray-200">Administrador</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <Button
-                                onClick={handleCreateUser}
-                                disabled={isCreating}
-                                className="w-full bg-[#0066FF] hover:bg-[#0052CC] rounded-xl h-12 mt-2"
-                            >
-                                {isCreating ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Creando...
-                                    </>
-                                ) : (
-                                    'Crear Usuario'
-                                )}
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <div>
+                    <h1 className="text-xl md:text-2xl font-bold text-white">Usuarios</h1>
+                    <p className="text-sm text-gray-400">Gestión de mecánicos y administradores</p>
+                </div>
             </div>
 
             {/* Search */}

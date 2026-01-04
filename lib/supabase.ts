@@ -38,6 +38,7 @@ export interface OrdenDB {
 
 export interface PerfilDB {
     id: string; // UUID (auth.users.id)
+    email?: string;
     nombre_completo: string;
     rol: 'mecanico' | 'admin';
     activo: boolean;

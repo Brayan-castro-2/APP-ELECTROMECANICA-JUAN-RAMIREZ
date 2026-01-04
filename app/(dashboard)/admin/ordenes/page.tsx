@@ -24,7 +24,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Search, FileText, ChevronRight, Loader2, Trash2, Edit } from 'lucide-react';
+import { Search, FileText, ChevronRight, Loader2, Trash2, Edit, Download } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OrdenesPage() {
@@ -35,6 +35,7 @@ export default function OrdenesPage() {
     const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [mechanicFilter, setMechanicFilter] = useState<string>('all');
     const [isLoadingOther, setIsLoadingOther] = useState(true);
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
@@ -73,8 +74,9 @@ export default function OrdenesPage() {
             order.descripcion_ingreso.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesStatus = statusFilter === 'all' || order.estado === statusFilter;
+        const matchesMechanic = mechanicFilter === 'all' || order.asignado_a === mechanicFilter;
 
-        return matchesSearch && matchesStatus;
+        return matchesSearch && matchesStatus && matchesMechanic;
     });
 
     const handleDeleteOrder = async (orderId: number) => {
@@ -96,6 +98,79 @@ export default function OrdenesPage() {
         };
         const c = config[status] || config.pendiente;
         return <Badge className={`${c.class} border`}>{c.label}</Badge>;
+    };
+
+    const handleExportPDF = () => {
+        const printContent = filteredOrders.map(order => {
+            const vehiculo = getVehiculo(order.patente_vehiculo);
+            return {
+                patente: order.patente_vehiculo,
+                vehiculo: vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-',
+                descripcion: order.descripcion_ingreso,
+                creado_por: getPerfilNombre(order.creado_por),
+                asignado_a: order.asignado_a ? getPerfilNombre(order.asignado_a) : '-',
+                estado: order.estado,
+                precio: order.precio_total || 0
+            };
+        });
+
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Órdenes de Trabajo</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h1 { color: #333; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #0066FF; color: white; }
+                    tr:nth-child(even) { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                <h1>Órdenes de Trabajo - Electromecánica JR</h1>
+                <p>Total de órdenes: ${printContent.length}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patente</th>
+                            <th>Vehículo</th>
+                            <th>Descripción</th>
+                            <th>Creado por</th>
+                            <th>Asignado a</th>
+                            <th>Estado</th>
+                            <th>Precio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${printContent.map(o => `
+                            <tr>
+                                <td>${o.patente}</td>
+                                <td>${o.vehiculo}</td>
+                                <td>${o.descripcion}</td>
+                                <td>${o.creado_por}</td>
+                                <td>${o.asignado_a}</td>
+                                <td>${o.estado}</td>
+                                <td>$${o.precio.toLocaleString('es-CL')}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+        }
     };
 
     if (isLoading) {
@@ -121,28 +196,53 @@ export default function OrdenesPage() {
             {/* Filters */}
             <Card className="bg-slate-800/50 border-slate-700/50">
                 <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input
-                                placeholder="Buscar por patente, marca, modelo..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 rounded-xl"
-                            />
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    placeholder="Buscar por patente, marca, modelo..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 rounded-xl"
+                                />
+                            </div>
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className="w-full sm:w-48 bg-slate-700/50 border-slate-600 text-white rounded-xl">
+                                    <SelectValue placeholder="Estado" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-800 border-slate-700">
+                                    <SelectItem value="all" className="text-slate-200">Todos</SelectItem>
+                                    <SelectItem value="pendiente" className="text-slate-200">Pendientes</SelectItem>
+                                    <SelectItem value="en_progreso" className="text-slate-200">En Progreso</SelectItem>
+                                    <SelectItem value="completada" className="text-slate-200">Completadas</SelectItem>
+                                    <SelectItem value="cancelada" className="text-slate-200">Canceladas</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Select value={mechanicFilter} onValueChange={setMechanicFilter}>
+                                <SelectTrigger className="w-full sm:w-48 bg-slate-700/50 border-slate-600 text-white rounded-xl">
+                                    <SelectValue placeholder="Mecánico" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-800 border-slate-700">
+                                    <SelectItem value="all" className="text-slate-200">Todos los mecánicos</SelectItem>
+                                    {perfiles.filter(p => p.rol === 'mecanico' || p.rol === 'admin').map(perfil => (
+                                        <SelectItem key={perfil.id} value={perfil.id} className="text-slate-200">
+                                            {perfil.nombre_completo}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full sm:w-48 bg-slate-700/50 border-slate-600 text-white rounded-xl">
-                                <SelectValue placeholder="Estado" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-slate-800 border-slate-700">
-                                <SelectItem value="all" className="text-slate-200">Todos</SelectItem>
-                                <SelectItem value="pendiente" className="text-slate-200">Pendientes</SelectItem>
-                                <SelectItem value="en_progreso" className="text-slate-200">En Progreso</SelectItem>
-                                <SelectItem value="completada" className="text-slate-200">Completadas</SelectItem>
-                                <SelectItem value="cancelada" className="text-slate-200">Canceladas</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <div className="flex justify-end">
+                            <Button
+                                onClick={handleExportPDF}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                                disabled={filteredOrders.length === 0}
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Exportar a PDF
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

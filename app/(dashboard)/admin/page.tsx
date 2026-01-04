@@ -10,6 +10,11 @@ import {
     type PerfilDB, 
     type VehiculoDB
 } from '@/lib/storage-adapter';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +29,9 @@ import {
     TrendingUp,
     Loader2,
     Users,
-    DollarSign
+    DollarSign,
+    ChevronDown,
+    Calendar
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -99,12 +106,21 @@ export default function AdminPage() {
         setIsRefreshing(false);
     };
 
-    const stats = useMemo(() => ({
-        todayRevenue: todaysOrders.reduce((acc, o) => acc + (o.precio_total || 0), 0),
-        pending: allOrders.filter(o => o.estado === 'pendiente').length,
-        inProgress: allOrders.filter(o => o.estado === 'en_progreso').length,
-        completed: allOrders.filter(o => o.estado === 'completada').length,
-    }), [todaysOrders, allOrders]);
+    const stats = useMemo(() => {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const ordersThisMonth = allOrders.filter(o => {
+            const orderDate = new Date(o.fecha_ingreso);
+            return orderDate >= firstDayOfMonth;
+        });
+        
+        return {
+            todayRevenue: todaysOrders.reduce((acc, o) => acc + (o.precio_total || 0), 0),
+            pending: allOrders.filter(o => o.estado === 'pendiente').length,
+            monthlyRevenue: ordersThisMonth.reduce((acc, o) => acc + (o.precio_total || 0), 0),
+            completed: allOrders.filter(o => o.estado === 'completada').length,
+        };
+    }, [todaysOrders, allOrders]);
 
     // Calcular rendimiento de mecánicos
     const mechanicPerformance = useMemo(() => {
@@ -112,6 +128,7 @@ export default function AdminPage() {
         
         return mechanics.map(mechanic => {
             const assignedOrders = allOrders.filter(o => o.asignado_a === mechanic.id);
+            const completedOrders = assignedOrders.filter(o => o.estado === 'completada');
             const totalRevenue = assignedOrders.reduce((acc, o) => acc + (o.precio_total || 0), 0);
             
             return {
@@ -119,7 +136,8 @@ export default function AdminPage() {
                 name: mechanic.nombre_completo,
                 ordersCount: assignedOrders.length,
                 totalRevenue,
-                completedCount: assignedOrders.filter(o => o.estado === 'completada').length,
+                completedCount: completedOrders.length,
+                completedOrders: completedOrders,
             };
         }).sort((a, b) => b.ordersCount - a.ordersCount);
     }, [allOrders, perfiles]);
@@ -194,9 +212,9 @@ export default function AdminPage() {
 
                     <Card className="bg-[#1a1a1a] border border-[#333333]">
                         <CardContent className="p-4">
-                            <Wrench className="w-6 h-6 text-gray-400 mb-2" />
-                            <p className="text-3xl font-bold text-white">{stats.inProgress}</p>
-                            <p className="text-sm text-gray-400">En Progreso</p>
+                            <Calendar className="w-6 h-6 text-gray-400 mb-2" />
+                            <p className="text-3xl font-bold text-white">${stats.monthlyRevenue.toLocaleString('es-CL')}</p>
+                            <p className="text-sm text-gray-400">Monto Mensual</p>
                         </CardContent>
                     </Card>
 
@@ -270,6 +288,11 @@ export default function AdminPage() {
                                                     <p className="text-sm text-gray-400 truncate">
                                                         {order.descripcion_ingreso}
                                                     </p>
+                                                    {order.asignado_a && (
+                                                        <p className="text-xs text-blue-400 mt-1">
+                                                            Mecánico: {getPerfilNombre(order.asignado_a)}
+                                                        </p>
+                                                    )}
                                                 </div>
 
                                                 <div className="hidden sm:block">
@@ -322,37 +345,80 @@ export default function AdminPage() {
                 ) : (
                     <div className="space-y-3">
                         {mechanicPerformance.map((mechanic, index) => (
-                            <Card key={mechanic.id} className="bg-[#1a1a1a] border-[#333333]">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                                index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                index === 1 ? 'bg-gray-400/20 text-gray-300' :
-                                                index === 2 ? 'bg-orange-500/20 text-orange-400' :
-                                                'bg-[#333333] text-gray-400'
-                                            }`}>
-                                                #{index + 1}
+                            <Collapsible key={mechanic.id}>
+                                <Card className="bg-[#1a1a1a] border-[#333333]">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                                    index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    index === 1 ? 'bg-gray-400/20 text-gray-300' :
+                                                    index === 2 ? 'bg-orange-500/20 text-orange-400' :
+                                                    'bg-[#333333] text-gray-400'
+                                                }`}>
+                                                    #{index + 1}
+                                                </div>
+                                                <div>
+                                                    <p className="text-white font-medium">{mechanic.name}</p>
+                                                    <p className="text-xs text-gray-400">{mechanic.completedCount} completadas</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-white font-medium">{mechanic.name}</p>
-                                                <p className="text-xs text-gray-400">{mechanic.completedCount} completadas</p>
+                                            <div className="text-right">
+                                                <p className="text-white font-bold">{mechanic.ordersCount}</p>
+                                                <p className="text-xs text-gray-400">órdenes</p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-white font-bold">{mechanic.ordersCount}</p>
-                                            <p className="text-xs text-gray-400">órdenes</p>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <DollarSign className="w-4 h-4 text-green-400" />
+                                                <span className="text-green-400 font-semibold">
+                                                    ${mechanic.totalRevenue.toLocaleString('es-CL')}
+                                                </span>
+                                                <span className="text-gray-500">generados</span>
+                                            </div>
+                                            {mechanic.completedOrders.length > 0 && (
+                                                <CollapsibleTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                                                        Ver órdenes
+                                                        <ChevronDown className="w-4 h-4 ml-1" />
+                                                    </Button>
+                                                </CollapsibleTrigger>
+                                            )}
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <DollarSign className="w-4 h-4 text-green-400" />
-                                        <span className="text-green-400 font-semibold">
-                                            ${mechanic.totalRevenue.toLocaleString('es-CL')}
-                                        </span>
-                                        <span className="text-gray-500">generados</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                        <CollapsibleContent className="mt-3">
+                                            <div className="space-y-2 pt-3 border-t border-[#333333]">
+                                                {mechanic.completedOrders.map((order) => {
+                                                    const vehiculo = getVehiculo(order.patente_vehiculo);
+                                                    return (
+                                                        <Link key={order.id} href={`/admin/ordenes/clean?id=${order.id}`}>
+                                                            <div className="bg-[#242424] rounded-lg p-3 hover:bg-[#2a2a2a] transition-colors">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex-1">
+                                                                        <p className="text-white text-sm font-medium">
+                                                                            {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : order.patente_vehiculo}
+                                                                        </p>
+                                                                        <p className="text-xs text-gray-400 truncate">
+                                                                            {order.descripcion_ingreso}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="text-right ml-3">
+                                                                        <p className="text-green-400 text-sm font-semibold">
+                                                                            ${(order.precio_total || 0).toLocaleString('es-CL')}
+                                                                        </p>
+                                                                        <p className="text-xs text-gray-500">
+                                                                            {order.patente_vehiculo}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
+                                        </CollapsibleContent>
+                                    </CardContent>
+                                </Card>
+                            </Collapsible>
                         ))}
                     </div>
                 )}

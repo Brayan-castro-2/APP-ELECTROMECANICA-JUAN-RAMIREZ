@@ -92,27 +92,41 @@ function getNextOrderId(): number {
 export function initializeLocalStorage(): void {
     if (typeof window === 'undefined') return;
     
-    // Crear usuario admin por defecto si no existe
+    // Crear usuarios por defecto si no existen
     const perfiles = getFromStorage<PerfilDB[]>(KEYS.PERFILES, []);
     if (perfiles.length === 0) {
         const defaultUsers: PerfilDB[] = [
             {
-                id: 'admin-001',
-                nombre_completo: 'Administrador',
+                id: 'admin-juan',
+                nombre_completo: 'Juan',
                 rol: 'admin',
                 activo: true,
-                email: 'admin@gmail.com',
+                email: 'juan@taller.cl',
             },
             {
-                id: 'mecanico-001',
-                nombre_completo: 'Mecánico Principal',
+                id: 'admin-rodrigo',
+                nombre_completo: 'Rodrigo',
+                rol: 'admin',
+                activo: true,
+                email: 'rodrigo@taller.cl',
+            },
+            {
+                id: 'mecanico-francisco',
+                nombre_completo: 'Francisco',
                 rol: 'mecanico',
                 activo: true,
-                email: 'mecanico@gmail.com',
+                email: 'francisco@taller.cl',
+            },
+            {
+                id: 'mecanico-javier',
+                nombre_completo: 'Javier',
+                rol: 'mecanico',
+                activo: true,
+                email: 'javier@taller.cl',
             },
         ];
         saveToStorage(KEYS.PERFILES, defaultUsers);
-        console.log('✅ Usuarios por defecto creados');
+        console.log('✅ Usuarios creados: Juan (1989), Rodrigo (1986), Francisco (2001), Javier (2280)');
     }
 
     // Inicializar arrays vacíos si no existen
@@ -341,6 +355,17 @@ export async function obtenerOrdenesPorUsuario(userId: string): Promise<{
 
 // ============ AUTENTICACIÓN ============
 
+const CREDENTIALS: Record<string, string> = {
+    'juan': '1989',
+    'rodrigo': '1986',
+    'francisco': '2001',
+    'javier': '2280',
+    'juan@taller.cl': '1989',
+    'rodrigo@taller.cl': '1986',
+    'francisco@taller.cl': '2001',
+    'javier@taller.cl': '2280',
+};
+
 export async function loginConCredenciales(email: string, password: string): Promise<{
     user: { id: string; email: string } | null;
     perfil: PerfilDB | null;
@@ -348,8 +373,19 @@ export async function loginConCredenciales(email: string, password: string): Pro
 }> {
     const perfiles = getFromStorage<PerfilDB[]>(KEYS.PERFILES, []);
     
-    // Buscar usuario por email (en local no verificamos password, solo simulamos)
-    const perfil = perfiles.find(p => p.email === email);
+    const emailLower = email.toLowerCase().trim();
+    const passwordTrim = password.trim();
+    
+    const correctPassword = CREDENTIALS[emailLower];
+    if (!correctPassword || correctPassword !== passwordTrim) {
+        console.log('❌ Credenciales incorrectas para:', emailLower);
+        return { user: null, perfil: null, error: 'Credenciales incorrectas' };
+    }
+    
+    const perfil = perfiles.find(p => 
+        p.email?.toLowerCase() === emailLower || 
+        p.nombre_completo.toLowerCase() === emailLower
+    );
     
     if (!perfil) {
         return { user: null, perfil: null, error: 'Usuario no encontrado' };
@@ -359,11 +395,10 @@ export async function loginConCredenciales(email: string, password: string): Pro
         return { user: null, perfil: null, error: 'Usuario desactivado' };
     }
     
-    // Guardar sesión actual
-    const user = { id: perfil.id, email: email };
+    const user = { id: perfil.id, email: perfil.email || email };
     saveToStorage(KEYS.CURRENT_USER, { user, perfil });
     
-    console.log('✅ Login exitoso:', email);
+    console.log('✅ Login exitoso:', perfil.nombre_completo);
     return { user, perfil, error: null };
 }
 

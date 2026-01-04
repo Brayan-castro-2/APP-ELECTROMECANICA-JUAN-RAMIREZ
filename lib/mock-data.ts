@@ -14,41 +14,45 @@ export function setOfflineMode(offline: boolean) {
 // Perfiles/Usuarios mock
 export const mockPerfiles: PerfilDB[] = [
     {
-        id: 'admin-mock-id',
-        nombre_completo: 'Juan Ramírez (Admin)',
+        id: 'admin-juan',
+        nombre_completo: 'Juan',
         rol: 'admin',
         activo: true,
+        email: 'juan@taller.cl',
     },
     {
-        id: 'mecanico-1-id',
-        nombre_completo: 'Pedro González',
+        id: 'admin-rodrigo',
+        nombre_completo: 'Rodrigo',
+        rol: 'admin',
+        activo: true,
+        email: 'rodrigo@taller.cl',
+    },
+    {
+        id: 'mecanico-francisco',
+        nombre_completo: 'Francisco',
         rol: 'mecanico',
         activo: true,
+        email: 'francisco@taller.cl',
     },
     {
-        id: 'mecanico-2-id',
-        nombre_completo: 'Carlos Muñoz',
+        id: 'mecanico-javier',
+        nombre_completo: 'Javier',
         rol: 'mecanico',
         activo: true,
-    },
-    {
-        id: 'mecanico-3-id',
-        nombre_completo: 'María López',
-        rol: 'mecanico',
-        activo: false,
+        email: 'javier@taller.cl',
     },
 ];
 
 // Base de datos de vehículos para buscar por patente
 export const mockVehiculos: VehiculoDB[] = [
-    { patente: 'ABCD12', marca: 'Toyota', modelo: 'Corolla', anio: '2020', color: 'Blanco', cliente_id: null, fecha_creacion: '2024-01-01T00:00:00Z' },
-    { patente: 'WXYZ99', marca: 'Chevrolet', modelo: 'Spark', anio: '2019', color: 'Rojo', cliente_id: null, fecha_creacion: '2024-01-15T00:00:00Z' },
-    { patente: 'JKLM45', marca: 'Hyundai', modelo: 'Accent', anio: '2021', color: 'Gris', cliente_id: null, fecha_creacion: '2024-02-01T00:00:00Z' },
-    { patente: 'PQRS78', marca: 'Kia', modelo: 'Rio', anio: '2022', color: 'Negro', cliente_id: null, fecha_creacion: '2024-03-01T00:00:00Z' },
-    { patente: 'DEFG34', marca: 'Nissan', modelo: 'Versa', anio: '2018', color: 'Azul', cliente_id: null, fecha_creacion: '2024-03-15T00:00:00Z' },
-    { patente: 'HIJK56', marca: 'Mazda', modelo: '3', anio: '2023', color: 'Blanco', cliente_id: null, fecha_creacion: '2024-04-01T00:00:00Z' },
-    { patente: 'LMNO89', marca: 'Ford', modelo: 'Fiesta', anio: '2017', color: 'Plata', cliente_id: null, fecha_creacion: '2024-04-15T00:00:00Z' },
-    { patente: 'STUV01', marca: 'Volkswagen', modelo: 'Polo', anio: '2021', color: 'Gris', cliente_id: null, fecha_creacion: '2024-05-01T00:00:00Z' },
+    { patente: 'ABCD12', marca: 'Toyota', modelo: 'Corolla', anio: '2020', color: 'Blanco', fecha_creacion: '2024-01-01T00:00:00Z' },
+    { patente: 'WXYZ99', marca: 'Chevrolet', modelo: 'Spark', anio: '2019', color: 'Rojo', fecha_creacion: '2024-01-15T00:00:00Z' },
+    { patente: 'JKLM45', marca: 'Hyundai', modelo: 'Accent', anio: '2021', color: 'Gris', fecha_creacion: '2024-02-01T00:00:00Z' },
+    { patente: 'PQRS78', marca: 'Kia', modelo: 'Rio', anio: '2022', color: 'Negro', fecha_creacion: '2024-03-01T00:00:00Z' },
+    { patente: 'DEFG34', marca: 'Nissan', modelo: 'Versa', anio: '2018', color: 'Azul', fecha_creacion: '2024-03-15T00:00:00Z' },
+    { patente: 'HIJK56', marca: 'Mazda', modelo: '3', anio: '2023', color: 'Blanco', fecha_creacion: '2024-04-01T00:00:00Z' },
+    { patente: 'LMNO89', marca: 'Ford', modelo: 'Fiesta', anio: '2017', color: 'Plata', fecha_creacion: '2024-04-15T00:00:00Z' },
+    { patente: 'QRST12', marca: 'Honda', modelo: 'Civic', anio: '2021', color: 'Gris', fecha_creacion: '2024-05-01T00:00:00Z' },
 ];
 
 // Órdenes de trabajo mock

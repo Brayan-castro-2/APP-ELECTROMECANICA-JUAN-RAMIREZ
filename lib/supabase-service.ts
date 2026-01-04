@@ -457,23 +457,3 @@ export async function crearUsuario(
         return { success: false, error: 'Error inesperado al crear usuario' };
     }
 }
-
-// Actualizar perfil
-export async function actualizarPerfil(
-    id: string,
-    updates: Partial<Omit<PerfilDB, 'id'>>
-): Promise<PerfilDB | null> {
-    const { data, error } = await supabase
-        .from('perfiles')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error al actualizar perfil:', error);
-        return null;
-    }
-
-    return data;
-}

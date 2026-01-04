@@ -1,10 +1,4 @@
-// Servicio para consultar patentes de vehículos chilenos usando GetAPI
-// Documentación: https://getapi.cl
-// API Key: 59a683af-8a30-47b9-9a22-f1a6a35ebf29
-
 const GETAPI_BASE_URL = 'https://chile.getapi.cl/v1/vehicles/plate';
-
-// Estructura de respuesta de la API según documentación oficial
 export interface GetAPIVehicleData {
     id: string;
     licensePlate: string;
@@ -57,15 +51,9 @@ export interface GetAPIError {
     message: string;
 }
 
-/**
- * Consulta información de un vehículo por su patente usando GetAPI
- * @param patente - Patente del vehículo (formato chileno)
- * @returns Información del vehículo o null si no se encuentra
- */
 export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVehicleResponse | null> {
     const apiKey = process.env.NEXT_PUBLIC_GETAPI_KEY;
     
-    // Si no hay API key configurada, retornar null para usar datos mock
     if (!apiKey) {
         console.warn('⚠️ NEXT_PUBLIC_GETAPI_KEY no configurada. Usando datos mock.');
         return null;
@@ -97,20 +85,17 @@ export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVeh
 
             if (response.status === 401 || response.status === 403) {
                 console.error('⚠️ API Key inválida, expirada o sin créditos');
-                // No lanzar error, solo retornar null para permitir entrada manual
                 return null;
             }
 
             const errorData = await response.json().catch(() => null) as GetAPIError | null;
             console.warn(`⚠️ Error ${response.status} en GetAPI:`, errorData?.error);
-            // Retornar null en lugar de lanzar error para permitir entrada manual
             return null;
         }
 
         const apiResponse = await response.json() as GetAPIResponse;
         console.log(`✅ Vehículo encontrado en GetAPI:`, apiResponse);
         
-        // Transformar la respuesta de la API al formato que usa la app
         if (apiResponse.success && apiResponse.data) {
             const vehiculo = apiResponse.data;
             const transformed: GetAPIVehicleResponse = {
@@ -132,28 +117,19 @@ export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVeh
     } catch (error) {
         if (error instanceof Error) {
             console.error('❌ Error consultando GetAPI:', error.message);
-            // Re-lanzar errores específicos de la API
             if (error.message.includes('Límite') || error.message.includes('API Key')) {
                 throw error;
             }
         }
-        // Para otros errores (red, timeout, etc), retornar null para usar fallback
         console.error('❌ Error de red o timeout. Usando datos locales.');
         return null;
     }
 }
 
-/**
- * Verifica si la API key está configurada y es válida
- * @returns true si la API está lista para usar
- */
 export function isGetAPIConfigured(): boolean {
     return !!process.env.NEXT_PUBLIC_GETAPI_KEY;
 }
 
-/**
- * Obtiene información sobre el estado de la API
- */
 export function getAPIStatus(): { configured: boolean; key: string } {
     const apiKey = process.env.NEXT_PUBLIC_GETAPI_KEY;
     return {

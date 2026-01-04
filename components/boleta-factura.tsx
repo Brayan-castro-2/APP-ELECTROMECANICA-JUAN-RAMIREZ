@@ -59,7 +59,6 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
     };
 
     const handleEmail = async () => {
-        // TODO: Implementar envío por email
         alert('Funcionalidad de envío por email próximamente');
     };
 
@@ -116,14 +115,19 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
                 </Button>
             </div>
 
-            {/* Boleta/Factura - Se imprime */}
             <div ref={boletaRef} className="bg-white text-black p-8 rounded-lg print:shadow-none print:p-0">
-                {/* Header */}
                 <div className="border-b-2 border-black pb-4 mb-6">
                     <div className="flex justify-between items-start">
-                        <div>
-                            <h1 className="text-3xl font-bold">ELECTROMECÁNICA</h1>
-                            <h2 className="text-2xl font-bold text-[#0066FF]">JR</h2>
+                        <div className="flex items-center gap-4">
+                            <img 
+                                src="/imagenes/fondoboleta.png" 
+                                alt="Logo Electromecánica JR" 
+                                className="h-20 w-auto object-contain"
+                            />
+                            <div>
+                                <h1 className="text-3xl font-bold">ELECTROMECÁNICA</h1>
+                                <h2 className="text-2xl font-bold text-[#0066FF]">JR</h2>
+                            </div>
                         </div>
                         <div className="text-right">
                             <p className="text-2xl font-bold">BOLETA #{orden.id}</p>
@@ -132,7 +136,6 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
                     </div>
                 </div>
 
-                {/* Datos del Cliente */}
                 <div className="mb-6">
                     <h3 className="font-bold text-lg mb-2">DATOS DEL CLIENTE</h3>
                     <div className="grid grid-cols-2 gap-4">

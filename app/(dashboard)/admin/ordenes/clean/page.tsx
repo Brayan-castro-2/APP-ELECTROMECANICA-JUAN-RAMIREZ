@@ -225,14 +225,6 @@ export default function OrdenesCleanPage() {
             return;
         }
 
-        const kmIn = parseFloat(kmIngreso) || 0;
-        const kmOut = parseFloat(kmSalida) || 0;
-        
-        if (kmOut > 0 && kmOut < kmIn) {
-            alert('El kilometraje de salida no puede ser menor al de ingreso');
-            return;
-        }
-
         let descripcionActualizada = descripcion;
         if (kmIngreso && kmSalida) {
             const precioKm = precio > 0 ? precio : 15000;

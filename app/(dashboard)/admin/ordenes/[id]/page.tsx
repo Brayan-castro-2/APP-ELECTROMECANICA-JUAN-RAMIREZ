@@ -98,17 +98,8 @@ export default function OrdenDetailPage() {
             return;
         }
 
-        const kmIn = parseFloat(kmIngreso) || 0;
-        const kmOut = parseFloat(kmSalida) || 0;
-        
-        if (kmOut > 0 && kmOut < kmIn) {
-            alert('El kilometraje de salida no puede ser menor al de ingreso');
-            return;
-        }
-
         let descripcionActualizada = descripcion;
         if (kmIngreso && kmSalida) {
-            const kmDiff = kmOut - kmIn;
             const precioKm = precio > 0 ? precio : 15000;
             descripcionActualizada = `${descripcion}\n\nServicios:\n- KM: ${kmIngreso} KM → ${kmSalida} KM: $${precioKm.toLocaleString('es-CL')}`;
         }

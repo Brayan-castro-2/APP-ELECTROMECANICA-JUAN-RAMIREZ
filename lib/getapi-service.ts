@@ -1,7 +1,45 @@
 // Servicio para consultar patentes de vehículos chilenos usando GetAPI
 // Documentación: https://getapi.cl
+// API Key: 59a683af-8a30-47b9-9a22-f1a6a35ebf29
 
-const GETAPI_BASE_URL = 'https://chile.getapi.cl/v1/vehiculos/placa';
+const GETAPI_BASE_URL = 'https://chile.getapi.cl/v1/vehicles/plate';
+
+// Estructura de respuesta de la API según documentación oficial
+export interface GetAPIVehicleData {
+    id: string;
+    licensePlate: string;
+    dvLicensePlate: string;
+    modelId: string;
+    version: string;
+    mileage: number | null;
+    color: string;
+    year: number;
+    codeSii: string | null;
+    vinNumber: string;
+    engineNumber: string;
+    engine: string;
+    fuel: string;
+    transmission: string;
+    doors: number;
+    urlImage: string;
+    model: {
+        id: string;
+        name: string;
+        typeVehicle: {
+            name: string;
+        };
+        brand: {
+            name: string;
+        };
+    };
+    monthRT: string;
+}
+
+export interface GetAPIResponse {
+    success: boolean;
+    status: number;
+    data: GetAPIVehicleData;
+}
 
 export interface GetAPIVehicleResponse {
     patente: string;
@@ -12,7 +50,6 @@ export interface GetAPIVehicleResponse {
     color?: string;
     tipo?: string;
     combustible?: string;
-    // Otros campos que pueda retornar la API
 }
 
 export interface GetAPIError {
@@ -70,10 +107,28 @@ export async function consultarPatenteGetAPI(patente: string): Promise<GetAPIVeh
             return null;
         }
 
-        const data = await response.json() as GetAPIVehicleResponse;
-        console.log(`✅ Vehículo encontrado en GetAPI:`, data);
+        const apiResponse = await response.json() as GetAPIResponse;
+        console.log(`✅ Vehículo encontrado en GetAPI:`, apiResponse);
         
-        return data;
+        // Transformar la respuesta de la API al formato que usa la app
+        if (apiResponse.success && apiResponse.data) {
+            const vehiculo = apiResponse.data;
+            const transformed: GetAPIVehicleResponse = {
+                patente: vehiculo.licensePlate,
+                marca: vehiculo.model.brand.name,
+                modelo: vehiculo.model.name,
+                anio: vehiculo.year.toString(),
+                motor: vehiculo.engine,
+                color: vehiculo.color,
+                tipo: vehiculo.model.typeVehicle.name,
+                combustible: vehiculo.fuel,
+            };
+            console.log(`✅ Datos transformados:`, transformed);
+            return transformed;
+        }
+        
+        console.warn('⚠️ Respuesta de API sin datos válidos');
+        return null;
     } catch (error) {
         if (error instanceof Error) {
             console.error('❌ Error consultando GetAPI:', error.message);

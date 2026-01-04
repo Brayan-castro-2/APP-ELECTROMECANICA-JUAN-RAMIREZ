@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const GETAPI_BASE_URL = 'https://chile.getapi.cl/v1/vehiculos/placa';
+const GETAPI_BASE_URL = 'https://chile.getapi.cl/v1/vehicles/plate';
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
@@ -26,12 +26,13 @@ export async function GET(request: NextRequest) {
         const patenteNormalizada = patente.toUpperCase().replace(/[^A-Z0-9]/g, '');
         
         console.log(`🔍 [API Route] Consultando patente ${patenteNormalizada} en GetAPI...`);
+        console.log(`🔑 [API Route] Usando API Key: ${apiKey.substring(0, 8)}...`);
         
         const response = await fetch(`${GETAPI_BASE_URL}/${patenteNormalizada}`, {
             method: 'GET',
             headers: {
-                'X-Api-Key': apiKey,
-                'Content-Type': 'application/json',
+                'accept': 'application/json',
+                'x-api-key': apiKey,
             },
         });
 

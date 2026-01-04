@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useOrders } from '@/hooks/use-orders';
 import {
-    obtenerOrdenes,
-    obtenerOrdenesHoy,
     obtenerPerfiles,
     obtenerVehiculos,
     type OrdenDB, 
@@ -51,60 +50,48 @@ function StatsSkeleton() {
 }
 
 export default function AdminPage() {
-    const [todaysOrders, setTodaysOrders] = useState<OrdenDB[]>([]);
-    const [allOrders, setAllOrders] = useState<OrdenDB[]>([]);
+    const { data: allOrders = [], isLoading: isLoadingOrders } = useOrders();
     const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingOther, setIsLoadingOther] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const loadData = async () => {
+    const isLoading = isLoadingOrders || isLoadingOther;
+
+    const todaysOrders = useMemo(() => {
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        return allOrders.filter(o => {
+            const fechaOrden = new Date(o.fecha_ingreso);
+            fechaOrden.setHours(0, 0, 0, 0);
+            return fechaOrden.getTime() === hoy.getTime();
+        });
+    }, [allOrders]);
+
+    const loadData = useCallback(async () => {
         try {
-            console.log('🔄 Cargando datos del dashboard...');
-            
-            const [ordenes, perfs, vehs] = await Promise.all([
-                obtenerOrdenes(),
+            const [perfs, vehs] = await Promise.all([
                 obtenerPerfiles(),
                 obtenerVehiculos()
             ]);
-
-            console.log('✅ Datos cargados:', { ordenes: ordenes?.length, perfiles: perfs?.length, vehiculos: vehs?.length });
-
-            // Filtrar órdenes de hoy manualmente
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
-            const ordenesHoy = (ordenes || []).filter(o => {
-                const fechaOrden = new Date(o.fecha_ingreso);
-                fechaOrden.setHours(0, 0, 0, 0);
-                return fechaOrden.getTime() === hoy.getTime();
-            });
-
-            console.log('📊 Órdenes de hoy:', ordenesHoy.length);
-
-            setTodaysOrders(ordenesHoy);
-            setAllOrders(ordenes || []);
             setPerfiles(perfs || []);
             setVehiculos(vehs || []);
-        } catch (e: any) {
-            console.error('❌ Error cargando datos:', e);
-            setTodaysOrders([]);
-            setAllOrders([]);
-            setPerfiles([]);
-            setVehiculos([]);
+        } catch (error) {
+            console.error('❌ Error cargando datos:', error);
         } finally {
-            setIsLoading(false);
+            setIsLoadingOther(false);
+            setIsRefreshing(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadData();
     }, []);
 
-    const handleRefresh = async () => {
+    const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
         await loadData();
-        setIsRefreshing(false);
-    };
+    }, [loadData]);
 
     const stats = useMemo(() => {
         const now = new Date();

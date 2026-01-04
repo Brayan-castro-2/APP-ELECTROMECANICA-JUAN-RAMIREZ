@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -42,6 +43,10 @@ export default function OrdenDetailPage() {
     const [descripcion, setDescripcion] = useState('');
     const [estado, setEstado] = useState('pendiente');
     const [asignadoA, setAsignadoA] = useState<string>('');
+    const [precioTotal, setPrecioTotal] = useState<string>('0');
+    const [detalleTrabajos, setDetalleTrabajos] = useState('');
+    const [kmIngreso, setKmIngreso] = useState<string>('');
+    const [kmSalida, setKmSalida] = useState<string>('');
 
     useEffect(() => {
         if (Number.isFinite(orderId)) {
@@ -63,6 +68,14 @@ export default function OrdenDetailPage() {
                 setDescripcion(ordenData.descripcion_ingreso);
                 setEstado(ordenData.estado);
                 setAsignadoA(ordenData.asignado_a || '');
+                setPrecioTotal(ordenData.precio_total?.toString() || '0');
+                setDetalleTrabajos(ordenData.detalle_trabajos || '');
+                
+                const servicios = ordenData.descripcion_ingreso || '';
+                const kmMatch = servicios.match(/KM:\s*(\d+\.?\d*)/);
+                const kmSalidaMatch = servicios.match(/→\s*(\d+\.?\d*)/);
+                if (kmMatch) setKmIngreso(kmMatch[1]);
+                if (kmSalidaMatch) setKmSalida(kmSalidaMatch[1]);
 
                 // Cargar datos del vehículo
                 const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
@@ -79,13 +92,36 @@ export default function OrdenDetailPage() {
     const handleSave = async () => {
         if (!order) return;
 
+        const precio = parseFloat(precioTotal) || 0;
+        if (precio < 0) {
+            alert('El precio no puede ser negativo');
+            return;
+        }
+
+        const kmIn = parseFloat(kmIngreso) || 0;
+        const kmOut = parseFloat(kmSalida) || 0;
+        
+        if (kmOut > 0 && kmOut < kmIn) {
+            alert('El kilometraje de salida no puede ser menor al de ingreso');
+            return;
+        }
+
+        let descripcionActualizada = descripcion;
+        if (kmIngreso && kmSalida) {
+            const kmDiff = kmOut - kmIn;
+            const precioKm = precio > 0 ? precio : 15000;
+            descripcionActualizada = `${descripcion}\n\nServicios:\n- KM: ${kmIngreso} KM → ${kmSalida} KM: $${precioKm.toLocaleString('es-CL')}`;
+        }
+
         setIsSaving(true);
 
         const updated = await actualizarOrden(order.id, {
-            descripcion_ingreso: descripcion,
+            descripcion_ingreso: descripcionActualizada,
             estado,
             asignado_a: asignadoA || null,
-        });
+            precio_total: precio,
+            detalle_trabajos: detalleTrabajos || null,
+        } as any);
 
         if (updated) {
             setOrder(updated);
@@ -253,8 +289,57 @@ export default function OrdenDetailPage() {
                         <Textarea
                             value={descripcion}
                             onChange={(e) => setDescripcion(e.target.value)}
-                            className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                            className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                            placeholder="Describe el motivo de ingreso del vehículo..."
                         />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label className="text-slate-300">KM Ingreso</Label>
+                            <Input
+                                type="number"
+                                value={kmIngreso}
+                                onChange={(e) => setKmIngreso(e.target.value)}
+                                className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                placeholder="150000"
+                                min="0"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-slate-300">KM Salida</Label>
+                            <Input
+                                type="number"
+                                value={kmSalida}
+                                onChange={(e) => setKmSalida(e.target.value)}
+                                className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                placeholder="130000"
+                                min="0"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-slate-300">Detalle de Trabajos Realizados</Label>
+                        <Textarea
+                            value={detalleTrabajos}
+                            onChange={(e) => setDetalleTrabajos(e.target.value)}
+                            className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                            placeholder="Describe los trabajos realizados en el vehículo..."
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-slate-300">Precio Total ($)</Label>
+                        <Input
+                            type="number"
+                            value={precioTotal}
+                            onChange={(e) => setPrecioTotal(e.target.value)}
+                            className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-lg font-semibold"
+                            placeholder="15000"
+                            min="0"
+                        />
+                        <p className="text-xs text-slate-400">Precio en pesos chilenos</p>
                     </div>
 
                     <Button

@@ -232,13 +232,21 @@ export default function OrdenesCleanPage() {
         }
 
         setIsSaving(true);
-        const updated = await actualizarOrden(order.id, {
+        const updateData: any = {
             descripcion_ingreso: descripcionActualizada,
             estado,
-            asignado_a: asignadoA || null,
             precio_total: precio,
-            detalle_trabajos: detalleTrabajos || null,
-        } as any);
+        };
+        
+        if (asignadoA) {
+            updateData.asignado_a = asignadoA;
+        }
+        
+        if (detalleTrabajos) {
+            updateData.detalle_trabajos = detalleTrabajos;
+        }
+        
+        const updated = await actualizarOrden(order.id, updateData);
         
         if (updated) {
             setOrder(updated);

@@ -131,8 +131,10 @@ export async function actualizarPerfil(
     updates: Partial<Omit<PerfilDB, 'id'>>
 ): Promise<PerfilDB | null> {
     if (isSupabase()) {
+        console.log('🔵 Usando Supabase para actualizar perfil');
         return supabaseService.actualizarPerfil(id, updates);
     }
+    console.log('🟡 Usando localStorage para actualizar perfil');
     return localService.actualizarPerfil(id, updates);
 }
 

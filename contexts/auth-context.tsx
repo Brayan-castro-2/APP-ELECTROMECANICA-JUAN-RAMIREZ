@@ -78,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: false, error: result.error || 'Error de autenticación' };
             }
 
+            // Verificar si el usuario está activo
+            if (!result.perfil.activo) {
+                return { success: false, error: 'Usuario desactivado. Contacta al administrador.' };
+            }
+
             // Convertir perfil a AuthUser
             const authUser: AuthUser = {
                 id: result.user.id,

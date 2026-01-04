@@ -305,6 +305,29 @@ export async function obtenerPerfilPorId(id: string): Promise<PerfilDB | null> {
     return data;
 }
 
+// Actualizar perfil
+export async function actualizarPerfil(
+    id: string,
+    updates: Partial<Omit<PerfilDB, 'id'>>
+): Promise<PerfilDB | null> {
+    console.log(`🔵 Actualizando perfil ${id} en Supabase:`, updates);
+    
+    const { data, error } = await supabase
+        .from('perfiles')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('❌ Error al actualizar perfil:', error);
+        return null;
+    }
+
+    console.log('✅ Perfil actualizado en Supabase:', data);
+    return data;
+}
+
 // Obtener órdenes de un usuario
 export async function obtenerOrdenesPorUsuario(userId: string): Promise<{
     creadas: OrdenDB[];

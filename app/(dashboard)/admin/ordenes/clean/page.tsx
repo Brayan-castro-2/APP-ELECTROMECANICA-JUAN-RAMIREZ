@@ -3,12 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { actualizarOrden, buscarVehiculoPorPatente, obtenerOrdenPorId, type OrdenDB, type VehiculoDB } from '@/lib/storage-adapter';
+import { actualizarOrden, buscarVehiculoPorPatente, obtenerOrdenPorId, obtenerPerfiles, type OrdenDB, type VehiculoDB, type PerfilDB } from '@/lib/storage-adapter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Download, Loader2, Printer } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { CheckCircle, Download, Loader2, Printer, Save } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OrdenesCleanPage() {
@@ -21,10 +30,18 @@ export default function OrdenesCleanPage() {
 
     const [order, setOrder] = useState<OrdenDB | null>(null);
     const [vehiculo, setVehiculo] = useState<VehiculoDB | null>(null);
+    const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [precioFinal, setPrecioFinal] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    
+    const [descripcion, setDescripcion] = useState('');
+    const [estado, setEstado] = useState('pendiente');
+    const [asignadoA, setAsignadoA] = useState<string>('');
+    const [detalleTrabajos, setDetalleTrabajos] = useState('');
+    const [kmIngreso, setKmIngreso] = useState<string>('');
+    const [kmSalida, setKmSalida] = useState<string>('');
 
     const parsePrecio = (value: string) => {
         const digits = value.replace(/[^0-9]/g, '');
@@ -51,10 +68,27 @@ export default function OrdenesCleanPage() {
         }
 
         const loadData = async () => {
-            const ordenData = await obtenerOrdenPorId(orderId);
+            const [ordenData, perfs] = await Promise.all([
+                obtenerOrdenPorId(orderId),
+                obtenerPerfiles()
+            ]);
+            
             setOrder(ordenData);
+            setPerfiles(perfs);
+            
             if (ordenData) {
                 setPrecioFinal(formatPrecio(ordenData.precio_total || 0));
+                setDescripcion(ordenData.descripcion_ingreso);
+                setEstado(ordenData.estado);
+                setAsignadoA(ordenData.asignado_a || '');
+                setDetalleTrabajos(ordenData.detalle_trabajos || '');
+                
+                const servicios = ordenData.descripcion_ingreso || '';
+                const kmMatch = servicios.match(/KM:\s*(\d+\.?\d*)/);
+                const kmSalidaMatch = servicios.match(/→\s*(\d+\.?\d*)/);
+                if (kmMatch) setKmIngreso(kmMatch[1]);
+                if (kmSalidaMatch) setKmSalida(kmSalidaMatch[1]);
+                
                 const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
                 setVehiculo(veh);
             }
@@ -181,14 +215,39 @@ export default function OrdenesCleanPage() {
         }
     };
 
-    const handleGuardarPrecio = async () => {
+    const handleGuardarTodo = async () => {
         if (!order) return;
         if (user?.role !== 'admin') return;
 
+        const precio = parsePrecio(precioFinal);
+        if (precio < 0) {
+            alert('El precio no puede ser negativo');
+            return;
+        }
+
+        const kmIn = parseFloat(kmIngreso) || 0;
+        const kmOut = parseFloat(kmSalida) || 0;
+        
+        if (kmOut > 0 && kmOut < kmIn) {
+            alert('El kilometraje de salida no puede ser menor al de ingreso');
+            return;
+        }
+
+        let descripcionActualizada = descripcion;
+        if (kmIngreso && kmSalida) {
+            const precioKm = precio > 0 ? precio : 15000;
+            descripcionActualizada = `${descripcion}\n\nServicios:\n- KM: ${kmIngreso} KM → ${kmSalida} KM: $${precioKm.toLocaleString('es-CL')}`;
+        }
+
         setIsSaving(true);
         const updated = await actualizarOrden(order.id, {
-            precio_total: parsePrecio(precioFinal),
-        });
+            descripcion_ingreso: descripcionActualizada,
+            estado,
+            asignado_a: asignadoA || null,
+            precio_total: precio,
+            detalle_trabajos: detalleTrabajos || null,
+        } as any);
+        
         if (updated) {
             setOrder(updated);
             setPrecioFinal(formatPrecio(updated.precio_total || 0));
@@ -290,9 +349,9 @@ export default function OrdenesCleanPage() {
 
             <Card className="bg-slate-800/50 border-slate-700/50">
                 <CardHeader>
-                    <CardTitle className="text-white">Resumen</CardTitle>
+                    <CardTitle className="text-white">Detalles de la Orden</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-5">
                     <div className="flex items-center justify-between">
                         <span className="text-slate-400">Patente</span>
                         <span className="font-mono font-bold text-white">{order.patente_vehiculo}</span>
@@ -301,53 +360,135 @@ export default function OrdenesCleanPage() {
                         <span className="text-slate-400">Vehículo</span>
                         <span className="text-white">{vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-'}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Estado</span>
-                        <div className="flex items-center gap-2">
-                            <Badge className="bg-slate-700/50 text-slate-200 border border-slate-600">{order.estado}</Badge>
-                            {user?.role === 'admin' && order.estado !== 'completada' ? (
-                                <Button
-                                    size="sm"
-                                    onClick={handleMarcarListo}
-                                    disabled={isSaving}
-                                    className="bg-blue-600 hover:bg-blue-700 rounded-xl"
-                                >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Listo'}
-                                </Button>
-                            ) : null}
+                    {user?.role === 'admin' ? (
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Estado</Label>
+                                <Select value={estado} onValueChange={setEstado}>
+                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                        <SelectItem value="pendiente" className="text-slate-200">Pendiente</SelectItem>
+                                        <SelectItem value="en_progreso" className="text-slate-200">En Progreso</SelectItem>
+                                        <SelectItem value="completada" className="text-slate-200">Completada</SelectItem>
+                                        <SelectItem value="cancelada" className="text-slate-200">Cancelada</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Asignado a</Label>
+                                <Select value={asignadoA || 'none'} onValueChange={(v) => setAsignadoA(v === 'none' ? '' : v)}>
+                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl">
+                                        <SelectValue placeholder="Seleccionar mecánico" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                        <SelectItem value="none" className="text-slate-200">Sin asignar</SelectItem>
+                                        {perfiles.filter(p => p.rol === 'mecanico' || p.rol === 'admin').map((perfil) => (
+                                            <SelectItem key={perfil.id} value={perfil.id} className="text-slate-200">
+                                                {perfil.nombre_completo}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Precio Final</span>
-                        {user?.role === 'admin' ? (
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center">
-                                    <span className="text-slate-300 mr-2">$</span>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Estado</span>
+                            <Badge className="bg-slate-700/50 text-slate-200 border border-slate-600">{order.estado}</Badge>
+                        </div>
+                    )}
+                    {user?.role === 'admin' ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Motivo de Ingreso</Label>
+                                <Textarea
+                                    value={descripcion}
+                                    onChange={(e) => setDescripcion(e.target.value)}
+                                    className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                    placeholder="Describe el motivo de ingreso del vehículo..."
+                                />
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-slate-300">KM Ingreso</Label>
                                     <Input
-                                        value={precioFinal}
-                                        onChange={(e) => setPrecioFinal(e.target.value)}
-                                        onBlur={() => setPrecioFinal(formatPrecio(parsePrecio(precioFinal)))}
-                                        inputMode="numeric"
-                                        className="w-36 bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                        type="number"
+                                        value={kmIngreso}
+                                        onChange={(e) => setKmIngreso(e.target.value)}
+                                        className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                        placeholder="150000"
+                                        min="0"
                                     />
                                 </div>
-                                <Button
-                                    size="sm"
-                                    onClick={handleGuardarPrecio}
-                                    disabled={isSaving}
-                                    className="bg-blue-600 hover:bg-blue-700 rounded-xl"
-                                >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar'}
-                                </Button>
+                                <div className="space-y-2">
+                                    <Label className="text-slate-300">KM Salida</Label>
+                                    <Input
+                                        type="number"
+                                        value={kmSalida}
+                                        onChange={(e) => setKmSalida(e.target.value)}
+                                        className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                        placeholder="130000"
+                                        min="0"
+                                    />
+                                </div>
                             </div>
-                        ) : (
-                            <span className="text-white font-bold">${(order.precio_total || 0).toLocaleString('es-CL')}</span>
-                        )}
-                    </div>
-                    <div className="pt-2">
-                        <p className="text-slate-400 text-sm mb-1">Motivo</p>
-                        <p className="text-white whitespace-pre-wrap">{order.descripcion_ingreso}</p>
-                    </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Detalle de Trabajos Realizados</Label>
+                                <Textarea
+                                    value={detalleTrabajos}
+                                    onChange={(e) => setDetalleTrabajos(e.target.value)}
+                                    className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                    placeholder="Describe los trabajos realizados en el vehículo..."
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Precio Total ($)</Label>
+                                <Input
+                                    value={precioFinal}
+                                    onChange={(e) => setPrecioFinal(e.target.value)}
+                                    onBlur={() => setPrecioFinal(formatPrecio(parsePrecio(precioFinal)))}
+                                    inputMode="numeric"
+                                    className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-lg font-semibold"
+                                    placeholder="15000"
+                                />
+                                <p className="text-xs text-slate-400">Precio en pesos chilenos</p>
+                            </div>
+
+                            <Button
+                                onClick={handleGuardarTodo}
+                                disabled={isSaving}
+                                className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 rounded-xl"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-4 h-4 mr-2" />
+                                        Guardar Cambios
+                                    </>
+                                )}
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-400">Precio Final</span>
+                                <span className="text-white font-bold">${(order.precio_total || 0).toLocaleString('es-CL')}</span>
+                            </div>
+                            <div className="pt-2">
+                                <p className="text-slate-400 text-sm mb-1">Motivo</p>
+                                <p className="text-white whitespace-pre-wrap">{order.descripcion_ingreso}</p>
+                            </div>
+                        </>
+                    )}
 
                     {order.detalles_vehiculo ? (
                         <div className="pt-2">

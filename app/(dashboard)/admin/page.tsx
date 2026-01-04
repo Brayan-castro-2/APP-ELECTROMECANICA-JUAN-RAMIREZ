@@ -86,7 +86,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [loadData]);
 
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);

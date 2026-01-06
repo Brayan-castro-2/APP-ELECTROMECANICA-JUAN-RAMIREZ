@@ -32,6 +32,7 @@ export interface OrdenDB {
     fecha_completada?: string;
     cc?: string;
     metodo_pago?: string;
+    metodos_pago?: Array<{ metodo: string; monto: number }>;
 }
 
 export interface PerfilDB {

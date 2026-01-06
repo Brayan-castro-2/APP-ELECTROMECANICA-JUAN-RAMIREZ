@@ -34,6 +34,7 @@ export interface OrdenDB {
     detalle_trabajos?: string; // Descripción de trabajos realizados
     fecha_lista?: string; // Cuando mecánico marca como lista
     fecha_completada?: string; // Cuando admin completa con boleta
+    metodos_pago?: Array<{ metodo: string; monto: number }>; // Métodos de pago múltiples
 }
 
 export interface PerfilDB {

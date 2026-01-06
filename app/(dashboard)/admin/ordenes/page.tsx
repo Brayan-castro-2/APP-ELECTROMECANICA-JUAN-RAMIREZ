@@ -40,6 +40,7 @@ export default function OrdenesPage() {
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
     const isAdmin = user?.role === 'admin';
+    const canViewPrices = user?.name?.toLowerCase().includes('juan');
 
     useEffect(() => {
         const loadData = async () => {
@@ -148,7 +149,7 @@ export default function OrdenesPage() {
                             <th>Creado por</th>
                             <th>Asignado a</th>
                             <th>Estado</th>
-                            <th>Precio</th>
+                            ${canViewPrices ? '<th>Precio</th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -160,7 +161,7 @@ export default function OrdenesPage() {
                                 <td>${o.creado_por}</td>
                                 <td>${o.asignado_a}</td>
                                 <td>${o.estado}</td>
-                                <td>$${o.precio.toLocaleString('es-CL')}</td>
+                                ${canViewPrices ? `<td>$${o.precio.toLocaleString('es-CL')}</td>` : ''}
                             </tr>
                         `).join('')}
                     </tbody>
@@ -281,8 +282,11 @@ export default function OrdenesPage() {
                                     const vehiculo = getVehiculo(order.patente_vehiculo);
                                     return (
                                         <TableRow key={order.id} className="border-slate-700 hover:bg-slate-700/30">
-                                            <TableCell className="font-mono font-bold text-white">
-                                                {order.patente_vehiculo}
+                                            <TableCell className="font-mono text-white">
+                                                <div className="font-bold">{order.patente_vehiculo}</div>
+                                                {order.cliente_nombre && (
+                                                    <div className="text-xs text-slate-400 mt-1">{order.cliente_nombre}</div>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-slate-300">
                                                 {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-'}
@@ -356,7 +360,7 @@ export default function OrdenesPage() {
                                     <Card className="bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 transition-all">
                                         <CardContent className="p-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-14 h-10 bg-slate-600 rounded-lg flex items-center justify-center">
+                                                <div className="w-14 h-10 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
                                                     <span className="text-white font-mono font-bold text-xs">
                                                         {order.patente_vehiculo}
                                                     </span>
@@ -365,11 +369,16 @@ export default function OrdenesPage() {
                                                     <p className="text-white font-medium truncate text-sm">
                                                         {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : order.patente_vehiculo}
                                                     </p>
+                                                    {order.cliente_nombre && (
+                                                        <p className="text-xs text-blue-400 truncate">
+                                                            {order.cliente_nombre}
+                                                        </p>
+                                                    )}
                                                     <p className="text-xs text-slate-400 truncate">
                                                         {order.descripcion_ingreso}
                                                     </p>
                                                 </div>
-                                                <ChevronRight className="w-4 h-4 text-slate-500" />
+                                                <ChevronRight className="w-4 h-4 text-slate-500 flex-shrink-0" />
                                             </div>
                                             <div className="mt-2 flex items-center justify-between">
                                                 {getStatusBadge(order.estado)}

@@ -201,6 +201,21 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
                     </div>
                 )}
 
+                {/* Métodos de Pago */}
+                {orden.metodos_pago && orden.metodos_pago.length > 0 && (
+                    <div className="mb-6">
+                        <h3 className="font-bold text-lg mb-3">MÉTODOS DE PAGO</h3>
+                        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                            {orden.metodos_pago.map((mp, idx) => (
+                                <div key={idx} className="flex justify-between items-center">
+                                    <span className="capitalize text-gray-700">{mp.metodo}:</span>
+                                    <span className="font-semibold">{formatCurrency(mp.monto)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Total */}
                 <div className="border-t-2 border-black pt-4">
                     <div className="flex justify-between items-center">

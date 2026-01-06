@@ -42,6 +42,9 @@ export default function OrdenesCleanPage() {
     const [detalleTrabajos, setDetalleTrabajos] = useState('');
     const [kmIngreso, setKmIngreso] = useState<string>('');
     const [kmSalida, setKmSalida] = useState<string>('');
+    const [metodosPago, setMetodosPago] = useState<Array<{ metodo: string; monto: number }>>([]);
+
+    const canViewPrices = user?.name?.toLowerCase().includes('juan');
 
     const parsePrecio = (value: string) => {
         const digits = value.replace(/[^0-9]/g, '');
@@ -82,6 +85,7 @@ export default function OrdenesCleanPage() {
                 setEstado(ordenData.estado);
                 setAsignadoA(ordenData.asignado_a || '');
                 setDetalleTrabajos(ordenData.detalle_trabajos || '');
+                setMetodosPago(ordenData.metodos_pago || []);
                 
                 const servicios = ordenData.descripcion_ingreso || '';
                 const kmMatch = servicios.match(/KM:\s*(\d+\.?\d*)/);
@@ -225,6 +229,15 @@ export default function OrdenesCleanPage() {
             return;
         }
 
+        // Validar métodos de pago si hay alguno
+        if (metodosPago.length > 0) {
+            const totalPagos = metodosPago.reduce((sum, mp) => sum + mp.monto, 0);
+            if (totalPagos !== precio) {
+                alert(`La suma de los métodos de pago ($${totalPagos.toLocaleString('es-CL')}) debe ser igual al precio total ($${precio.toLocaleString('es-CL')})`);
+                return;
+            }
+        }
+
         let descripcionActualizada = descripcion;
         if (kmIngreso && kmSalida) {
             const precioKm = precio > 0 ? precio : 15000;
@@ -236,6 +249,7 @@ export default function OrdenesCleanPage() {
             descripcion_ingreso: descripcionActualizada,
             estado,
             precio_total: precio,
+            metodos_pago: metodosPago.length > 0 ? metodosPago : null,
         };
         
         if (asignadoA) {
@@ -446,18 +460,106 @@ export default function OrdenesCleanPage() {
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-slate-300">Precio Total ($)</Label>
-                                <Input
-                                    value={precioFinal}
-                                    onChange={(e) => setPrecioFinal(e.target.value)}
-                                    onBlur={() => setPrecioFinal(formatPrecio(parsePrecio(precioFinal)))}
-                                    inputMode="numeric"
-                                    className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-lg font-semibold"
-                                    placeholder="15000"
-                                />
-                                <p className="text-xs text-slate-400">Precio en pesos chilenos</p>
-                            </div>
+                            {canViewPrices && (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label className="text-slate-300">Precio Total ($)</Label>
+                                        <Input
+                                            value={precioFinal}
+                                            onChange={(e) => setPrecioFinal(e.target.value)}
+                                            onBlur={() => setPrecioFinal(formatPrecio(parsePrecio(precioFinal)))}
+                                            inputMode="numeric"
+                                            className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-lg font-semibold"
+                                            placeholder="15000"
+                                        />
+                                        <p className="text-xs text-slate-400">Precio en pesos chilenos</p>
+                                    </div>
+
+                                    {/* Métodos de Pago */}
+                                    <div className="space-y-3 border-t border-slate-700 pt-4">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-slate-300 text-base">Métodos de Pago</Label>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() => setMetodosPago([...metodosPago, { metodo: 'efectivo', monto: 0 }])}
+                                                className="bg-slate-600 hover:bg-slate-500 text-white rounded-lg"
+                                            >
+                                                + Agregar Método
+                                            </Button>
+                                        </div>
+
+                                        {metodosPago.length > 0 && (
+                                            <div className="space-y-2">
+                                                {metodosPago.map((mp, idx) => (
+                                                    <div key={idx} className="flex gap-2 items-center bg-slate-700/30 p-3 rounded-lg">
+                                                        <Select
+                                                            value={mp.metodo}
+                                                            onValueChange={(value) => {
+                                                                const updated = [...metodosPago];
+                                                                updated[idx].metodo = value;
+                                                                setMetodosPago(updated);
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="w-[140px] bg-slate-700 border-slate-600 text-white rounded-lg">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="bg-slate-800 border-slate-700">
+                                                                <SelectItem value="efectivo" className="text-slate-200">Efectivo</SelectItem>
+                                                                <SelectItem value="debito" className="text-slate-200">Débito</SelectItem>
+                                                                <SelectItem value="credito" className="text-slate-200">Crédito</SelectItem>
+                                                                <SelectItem value="transferencia" className="text-slate-200">Transferencia</SelectItem>
+                                                                <SelectItem value="debe" className="text-slate-200">Debe (Deuda)</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Input
+                                                            type="text"
+                                                            value={mp.monto > 0 ? formatPrecio(mp.monto) : ''}
+                                                            onChange={(e) => {
+                                                                const updated = [...metodosPago];
+                                                                updated[idx].monto = parsePrecio(e.target.value);
+                                                                setMetodosPago(updated);
+                                                            }}
+                                                            onBlur={(e) => {
+                                                                const updated = [...metodosPago];
+                                                                updated[idx].monto = parsePrecio(e.target.value);
+                                                                setMetodosPago(updated);
+                                                                e.target.value = formatPrecio(updated[idx].monto);
+                                                            }}
+                                                            placeholder="Monto"
+                                                            className="flex-1 bg-slate-700 border-slate-600 text-white rounded-lg"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                const updated = metodosPago.filter((_, i) => i !== idx);
+                                                                setMetodosPago(updated);
+                                                            }}
+                                                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        >
+                                                            ✕
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                                <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-700">
+                                                    <span className="text-slate-400">Total pagos:</span>
+                                                    <span className="text-white font-semibold">
+                                                        ${formatPrecio(metodosPago.reduce((sum, mp) => sum + mp.monto, 0))}
+                                                    </span>
+                                                </div>
+                                                {metodosPago.length > 0 && parsePrecio(precioFinal) > 0 && (
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-slate-400">Precio total:</span>
+                                                        <span className="text-white font-semibold">${precioFinal}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
 
                             <Button
                                 onClick={handleGuardarTodo}

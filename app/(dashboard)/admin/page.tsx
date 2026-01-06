@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { useOrders } from '@/hooks/use-orders';
 import {
     obtenerPerfiles,
@@ -50,6 +51,7 @@ function StatsSkeleton() {
 }
 
 export default function AdminPage() {
+    const { user } = useAuth();
     const { data: allOrders = [], isLoading: isLoadingOrders } = useOrders();
     const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);
@@ -57,6 +59,7 @@ export default function AdminPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const isLoading = isLoadingOrders || isLoadingOther;
+    const canViewPrices = user?.name?.toLowerCase().includes('juan');
 
     const todaysOrders = useMemo(() => {
         const hoy = new Date();
@@ -178,16 +181,18 @@ export default function AdminPage() {
                 <StatsSkeleton />
             ) : (
                 <div className="grid grid-cols-2 gap-3">
-                    <Card className="bg-[#0066FF] border-0 shadow-xl shadow-[#0066FF]/20">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <Car className="w-6 h-6 text-blue-200" />
-                                <TrendingUp className="w-4 h-4 text-blue-200" />
-                            </div>
-                            <p className="text-3xl font-bold text-white">${stats.todayRevenue.toLocaleString('es-CL')}</p>
-                            <p className="text-sm text-blue-200">Ingresos Hoy</p>
-                        </CardContent>
-                    </Card>
+                    {canViewPrices && (
+                        <Card className="bg-[#0066FF] border-0 shadow-xl shadow-[#0066FF]/20">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <Car className="w-6 h-6 text-blue-200" />
+                                    <TrendingUp className="w-4 h-4 text-blue-200" />
+                                </div>
+                                <p className="text-3xl font-bold text-white">${stats.todayRevenue.toLocaleString('es-CL')}</p>
+                                <p className="text-sm text-blue-200">Ingresos Hoy</p>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card className="bg-amber-500 border-0 shadow-xl shadow-amber-500/20">
                         <CardContent className="p-4">
@@ -197,13 +202,15 @@ export default function AdminPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-[#1a1a1a] border border-[#333333]">
-                        <CardContent className="p-4">
-                            <Calendar className="w-6 h-6 text-gray-400 mb-2" />
-                            <p className="text-3xl font-bold text-white">${stats.monthlyRevenue.toLocaleString('es-CL')}</p>
-                            <p className="text-sm text-gray-400">Monto Mensual</p>
-                        </CardContent>
-                    </Card>
+                    {canViewPrices && (
+                        <Card className="bg-[#1a1a1a] border border-[#333333]">
+                            <CardContent className="p-4">
+                                <Calendar className="w-6 h-6 text-gray-400 mb-2" />
+                                <p className="text-3xl font-bold text-white">${stats.monthlyRevenue.toLocaleString('es-CL')}</p>
+                                <p className="text-sm text-gray-400">Monto Mensual</p>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card className="bg-green-600 border-0 shadow-xl shadow-green-500/20">
                         <CardContent className="p-4">
@@ -356,13 +363,15 @@ export default function AdminPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 text-sm">
-                                                <DollarSign className="w-4 h-4 text-green-400" />
-                                                <span className="text-green-400 font-semibold">
-                                                    ${mechanic.totalRevenue.toLocaleString('es-CL')}
-                                                </span>
-                                                <span className="text-gray-500">generados</span>
-                                            </div>
+                                            {canViewPrices && (
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <DollarSign className="w-4 h-4 text-green-400" />
+                                                    <span className="text-green-400 font-semibold">
+                                                        ${mechanic.totalRevenue.toLocaleString('es-CL')}
+                                                    </span>
+                                                    <span className="text-gray-500">generados</span>
+                                                </div>
+                                            )}
                                             {mechanic.completedOrders.length > 0 && (
                                                 <CollapsibleTrigger asChild>
                                                     <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
@@ -389,9 +398,11 @@ export default function AdminPage() {
                                                                         </p>
                                                                     </div>
                                                                     <div className="text-right ml-3">
-                                                                        <p className="text-green-400 text-sm font-semibold">
-                                                                            ${(order.precio_total || 0).toLocaleString('es-CL')}
-                                                                        </p>
+                                                                        {canViewPrices && (
+                                                                            <p className="text-green-400 text-sm font-semibold">
+                                                                                ${(order.precio_total || 0).toLocaleString('es-CL')}
+                                                                            </p>
+                                                                        )}
                                                                         <p className="text-xs text-gray-500">
                                                                             {order.patente_vehiculo}
                                                                         </p>

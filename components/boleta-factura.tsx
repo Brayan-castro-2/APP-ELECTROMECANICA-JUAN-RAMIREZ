@@ -204,14 +204,26 @@ export function BoletaFactura({ orden, vehiculo, mecanico }: BoletaFacturaProps)
                 {/* Métodos de Pago */}
                 {orden.metodos_pago && orden.metodos_pago.length > 0 && (
                     <div className="mb-6">
-                        <h3 className="font-bold text-lg mb-3">MÉTODOS DE PAGO</h3>
+                        <h3 className="font-bold text-lg mb-3 border-b-2 border-gray-300 pb-2">MÉTODOS DE PAGO</h3>
                         <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                             {orden.metodos_pago.map((mp, idx) => (
-                                <div key={idx} className="flex justify-between items-center">
-                                    <span className="capitalize text-gray-700">{mp.metodo}:</span>
-                                    <span className="font-semibold">{formatCurrency(mp.monto)}</span>
+                                <div key={idx} className="flex justify-between items-center py-1">
+                                    <span className="text-gray-700 font-medium">
+                                        {mp.metodo === 'efectivo' && '💵 Efectivo'}
+                                        {mp.metodo === 'debito' && '💳 Débito'}
+                                        {mp.metodo === 'credito' && '💳 Crédito'}
+                                        {mp.metodo === 'transferencia' && '🏦 Transferencia'}
+                                        {mp.metodo === 'debe' && '📝 Debe (Deuda)'}
+                                    </span>
+                                    <span className="font-bold text-gray-900">{formatCurrency(mp.monto)}</span>
                                 </div>
                             ))}
+                            <div className="border-t-2 border-gray-300 pt-2 mt-2 flex justify-between items-center">
+                                <span className="font-bold text-gray-800">TOTAL PAGADO:</span>
+                                <span className="font-bold text-[#0066FF] text-lg">
+                                    {formatCurrency(orden.metodos_pago.reduce((sum, mp) => sum + mp.monto, 0))}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 )}

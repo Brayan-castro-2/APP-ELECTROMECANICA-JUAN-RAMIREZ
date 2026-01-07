@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
 import { actualizarOrden, buscarVehiculoPorPatente, obtenerOrdenPorId, obtenerPerfiles, type OrdenDB, type VehiculoDB, type PerfilDB } from '@/lib/storage-adapter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,7 @@ import Link from 'next/link';
 export default function OrdenesCleanPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
     const { user, isLoading: authLoading } = useAuth();
 
     const orderIdParam = searchParams.get('id');
@@ -267,6 +269,9 @@ export default function OrdenesCleanPage() {
             setPrecioFinal(formatPrecio(updated.precio_total || 0));
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2500);
+            
+            // Invalidar caché para actualizar lista de órdenes inmediatamente
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
         }
         setIsSaving(false);
     };
@@ -287,6 +292,9 @@ export default function OrdenesCleanPage() {
             setOrder(updated);
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2500);
+            
+            // Invalidar caché para actualizar lista de órdenes inmediatamente
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
         } else {
             console.error('❌ Error: No se pudo actualizar la orden');
             alert('Error al actualizar el estado. Por favor intenta de nuevo.');

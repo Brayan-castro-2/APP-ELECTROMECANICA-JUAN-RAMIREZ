@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recepción de Vehículos - JR</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #e2e8f0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #60a5fa;
+            font-size: 2rem;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #60a5fa;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #60a5fa;
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        input:disabled, textarea:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(148, 163, 184, 0.2);
+            color: #cbd5e1;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(148, 163, 184, 0.3);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-whatsapp {
+            background: #25d366;
+            color: white;
+        }
+
+        .btn-whatsapp:hover {
+            background: #20ba5a;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+
+        /* Modal Ticket */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .ticket-container {
+            background: white;
+            width: 320px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .ticket {
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            color: #000;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .ticket-header {
+            text-align: center;
+            margin-bottom: 16px;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 12px;
+        }
+
+        .ticket-logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .ticket-subtitle {
+            font-size: 10px;
+        }
+
+        .ticket-section {
+            margin: 12px 0;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 8px;
+        }
+
+        .ticket-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+
+        .ticket-label {
+            font-weight: bold;
+        }
+
+        .ticket-total {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 2px solid #000;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .ticket-footer {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 10px;
+            border-top: 2px dashed #000;
+            padding-top: 12px;
+        }
+
+        .ticket-actions {
+            padding: 16px;
+            background: #f3f4f6;
+            display: flex;
+            gap: 8px;
+        }
+
+        .ticket-actions .btn {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .ticket-container, .ticket-container * {
+                visibility: visible;
+            }
+            .ticket-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 80mm;
+            }
+            .ticket-actions {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Recepción de Vehículos</h1>
+
+        <form id="formRecepcion">
+            <!-- Datos del Cliente -->
+            <div class="card">
+                <div class="card-title">👤 Datos del Cliente</div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Nombre del Cliente *</label>
+                        <input type="text" id="clienteNombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono *</label>
+                        <input type="tel" id="clienteTelefono" required placeholder="+56912345678">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Datos del Vehículo -->
+            <div class="card">
+                <div class="card-title">🚗 Datos del Vehículo</div>
+                
+                <div id="alertVehiculo" class="alert alert-info" style="display: none;">
+                    ✓ Vehículo encontrado en la base de datos
+                </div>
+
+                <div class="form-group">
+                    <label>Patente *</label>
+                    <input 
+                        type="text" 
+                        id="patente" 
+                        maxlength="6" 
+                        required 
+                        placeholder="BBBB10"
+                        style="text-transform: uppercase; font-family: monospace; font-size: 1.2rem;"
+                    >
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Marca *</label>
+                        <input type="text" id="marca" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Modelo *</label>
+                        <input type="text" id="modelo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Año *</label>
+                        <input type="number" id="anio" required min="1900" max="2030">
+                    </div>
+                    <div class="form-group">
+                        <label>Color *</label>
+                        <input type="text" id="color" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detalles del Servicio -->
+            <div class="card">
+                <div class="card-title">📋 Detalles del Servicio</div>
+                
+                <div class="form-group">
+                    <label>Motivo de Ingreso *</label>
+                    <textarea id="descripcion" required placeholder="Describe el problema o servicio solicitado..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Mecánico Responsable *</label>
+                    <input type="text" id="mecanico" required>
+                </div>
+            </div>
+
+            <!-- Información de Pago -->
+            <div class="card">
+                <div class="card-title">💰 Información de Pago</div>
+                
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Precio Total *</label>
+                        <input type="number" id="precioTotal" required min="0" step="1000" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago *</label>
+                        <select id="metodoPago" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="tarjeta_debito">Tarjeta Débito</option>
+                            <option value="tarjeta_credito">Tarjeta Crédito</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">Limpiar</button>
+                <button type="button" class="btn btn-success" onclick="generarTicket()">Generar Ticket</button>
+                <button type="submit" class="btn btn-primary">Crear Orden</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Modal Ticket -->
+    <div id="modalTicket" class="modal">
+        <div class="ticket-container">
+            <div class="ticket" id="ticketContent">
+                <!-- El contenido se genera dinámicamente -->
+            </div>
+            <div class="ticket-actions">
+                <button class="btn btn-primary" onclick="imprimirTicket()">🖨️ Imprimir</button>
+                <button class="btn btn-whatsapp" onclick="enviarWhatsApp()">📱 WhatsApp</button>
+                <button class="btn btn-secondary" onclick="cerrarModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // 1. BASE DE DATOS LOCAL (SIMULADA)
+        // ========================================
+        const BASE_DATOS_LOCAL = {
+            'BBBB10': { marca: 'Toyota', modelo: 'Yaris', anio: 2018, color: 'Rojo' },
+            'PROFE1': { marca: 'Nissan', modelo: 'V16', anio: 2010, color: 'Plata' },
+            'TEST01': { marca: 'Chevrolet', modelo: 'Sail', anio: 2020, color: 'Blanco' }
+        };
+
+        // ========================================
+        // 2. INICIALIZACIÓN AL CARGAR
+        // ========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            cargarMecanicoAutomatico();
+            configurarBusquedaPatente();
+        });
+
+        // ========================================
+        // FUNCIÓN: Cargar Mecánico Automático
+        // ========================================
+        function cargarMecanicoAutomatico() {
+            const usuarioActual = localStorage.getItem('usuario_actual');
+            const inputMecanico = document.getElementById('mecanico');
+            
+            if (usuarioActual) {
+                try {
+                    const usuario = JSON.parse(usuarioActual);
+                    inputMecanico.value = usuario.nombre_completo || usuario.nombre || 'Usuario';
+                    inputMecanico.readOnly = true;
+                    inputMecanico.style.opacity = '0.8';
+                } catch (e) {
+                    inputMecanico.value = usuarioActual;
+                    inputMecanico.readOnly = true;
+                }
+            } else {
+                inputMecanico.readOnly = false;
+                inputMecanico.placeholder = 'Ingrese nombre del mecánico';
+            }
+        }
+
+        // ========================================
+        // FUNCIÓN: Configurar Búsqueda de Patente
+        // ========================================
+        function configurarBusquedaPatente() {
+            const inputPatente = document.getElementById('patente');
+            
+            inputPatente.addEventListener('blur', () => {
+                buscarPatente(inputPatente.value.toUpperCase());
+            });
+
+            inputPatente.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase();
+            });
+        }
+
+        // ========================================
+        // FUNCIÓN: Buscar Patente en Base Local
+        // ========================================
+        function buscarPatente(patente) {
+            const vehiculo = BASE_DATOS_LOCAL[patente];
+            const alert = document.getElementById('alertVehiculo');
+            
+            const marca = document.getElementById('marca');
+            const modelo = document.getElementById('modelo');
+            const anio = document.getElementById('anio');
+            const color = document.getElementById('color');
+
+            if (vehiculo) {
+                // Vehículo encontrado - Rellenar y bloquear
+                marca.value = vehiculo.marca;
+                modelo.value = vehiculo.modelo;
+                anio.value = vehiculo.anio;
+                color.value = vehiculo.color;
+
+                marca.readOnly = true;
+                modelo.readOnly = true;
+                anio.readOnly = true;
+                color.readOnly = true;
+
+                alert.style.display = 'flex';
+                alert.className = 'alert alert-success';
+                alert.textContent = `✓ Vehículo encontrado: ${vehiculo.marca} ${vehiculo.modelo}`;
+            } else {
+                // No encontrado - Desbloquear para entrada manual
+                marca.value = '';
+                modelo.value = '';
+                anio.value = '';
+                color.value = '';
+
+                marca.readOnly = false;
+                modelo.readOnly = false;
+                anio.readOnly = false;
+                color.readOnly = false;
+
+                if (patente.length >= 4) {
+                    alert.style.display = 'flex';
+                    alert.className = 'alert alert-info';
+                    alert.textContent = 'ℹ️ Vehículo no encontrado. Complete los datos manualmente.';
+                } else {
+                    alert.style.display = 'none';
+                }
+            }
+        }
+
+        // ========================================
+        // 3. FUNCIÓN: Generar Ticket
+        // ========================================
+        function generarTicket() {
+            // Validar que el formulario esté completo
+            const form = document.getElementById('formRecepcion');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            // Obtener datos del formulario
+            const datos = {
+                clienteNombre: document.getElementById('clienteNombre').value,
+                clienteTelefono: document.getElementById('clienteTelefono').value,
+                patente: document.getElementById('patente').value,
+                marca: document.getElementById('marca').value,
+                modelo: document.getElementById('modelo').value,
+                anio: document.getElementById('anio').value,
+                color: document.getElementById('color').value,
+                descripcion: document.getElementById('descripcion').value,
+                mecanico: document.getElementById('mecanico').value,
+                precioTotal: document.getElementById('precioTotal').value,
+                metodoPago: document.getElementById('metodoPago').value,
+                fecha: new Date().toLocaleDateString('es-CL'),
+                hora: new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            // Generar HTML del ticket
+            const ticketHTML = `
+                <div class="ticket-header">
+                    <div class="ticket-logo">JR</div>
+                    <div class="ticket-subtitle">Electromecánica</div>
+                    <div style="margin-top: 8px; font-size: 10px;">
+                        ${datos.fecha} - ${datos.hora}
+                    </div>
+                </div>
+
+                <div class="ticket-section">
+                    <div class="ticket-label">CLIENTE</div>
+                    <div>${datos.clienteNombre}</div>
+                    <div>Tel: ${datos.clienteTelefono}</div>
+                </div>
+
+                <div class="ticket-section">
+                    <div class="ticket-label">VEHÍCULO</div>
+                    <div class="ticket-row">
+                        <span>Patente:</span>
+                        <span><strong>${datos.patente}</strong></span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Marca:</span>
+                        <span>${datos.marca}</span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Modelo:</span>
+                        <span>${datos.modelo}</span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Año:</span>
+                        <span>${datos.anio}</span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Color:</span>
+                        <span>${datos.color}</span>
+                    </div>
+                </div>
+
+                <div class="ticket-section">
+                    <div class="ticket-label">SERVICIO</div>
+                    <div style="margin-top: 4px;">${datos.descripcion}</div>
+                    <div style="margin-top: 8px;">
+                        <strong>Mecánico:</strong> ${datos.mecanico}
+                    </div>
+                </div>
+
+                <div class="ticket-total">
+                    <div class="ticket-row">
+                        <span>TOTAL:</span>
+                        <span>$${parseInt(datos.precioTotal).toLocaleString('es-CL')}</span>
+                    </div>
+                    <div class="ticket-row" style="font-size: 12px; font-weight: normal;">
+                        <span>Método:</span>
+                        <span>${formatearMetodoPago(datos.metodoPago)}</span>
+                    </div>
+                </div>
+
+                <div class="ticket-footer">
+                    ¡Gracias por su confianza!<br>
+                    www.electromecanica-jr.cl
+                </div>
+            `;
+
+            // Mostrar modal
+            document.getElementById('ticketContent').innerHTML = ticketHTML;
+            document.getElementById('modalTicket').classList.add('active');
+
+            // Guardar datos para WhatsApp
+            window.datosTicketActual = datos;
+        }
+
+        // ========================================
+        // FUNCIÓN: Formatear Método de Pago
+        // ========================================
+        function formatearMetodoPago(metodo) {
+            const metodos = {
+                'efectivo': 'Efectivo',
+                'transferencia': 'Transferencia',
+                'tarjeta_debito': 'Tarjeta Débito',
+                'tarjeta_credito': 'Tarjeta Crédito'
+            };
+            return metodos[metodo] || metodo;
+        }
+
+        // ========================================
+        // FUNCIÓN: Imprimir Ticket
+        // ========================================
+        function imprimirTicket() {
+            window.print();
+        }
+
+        // ========================================
+        // FUNCIÓN: Enviar por WhatsApp
+        // ========================================
+        function enviarWhatsApp() {
+            const datos = window.datosTicketActual;
+            
+            const mensaje = `
+🔧 *ORDEN DE TRABAJO - JR*
+━━━━━━━━━━━━━━━━━━━━
+
+📅 *Fecha:* ${datos.fecha} ${datos.hora}
+
+👤 *CLIENTE*
+Nombre: ${datos.clienteNombre}
+Teléfono: ${datos.clienteTelefono}
+
+🚗 *VEHÍCULO*
+Patente: *${datos.patente}*
+Marca: ${datos.marca}
+Modelo: ${datos.modelo}
+Año: ${datos.anio}
+Color: ${datos.color}
+
+📋 *SERVICIO*
+${datos.descripcion}
+
+👨‍🔧 Mecánico: ${datos.mecanico}
+
+💰 *TOTAL: $${parseInt(datos.precioTotal).toLocaleString('es-CL')}*
+Método: ${formatearMetodoPago(datos.metodoPago)}
+
+━━━━━━━━━━━━━━━━━━━━
+¡Gracias por su confianza!
+            `.trim();
+
+            const mensajeCodificado = encodeURIComponent(mensaje);
+            const numeroWhatsApp = datos.clienteTelefono.replace(/\D/g, '');
+            const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${mensajeCodificado}`;
+            
+            window.open(urlWhatsApp, '_blank');
+        }
+
+        // ========================================
+        // FUNCIÓN: Cerrar Modal
+        // ========================================
+        function cerrarModal() {
+            document.getElementById('modalTicket').classList.remove('active');
+        }
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('modalTicket').addEventListener('click', (e) => {
+            if (e.target.id === 'modalTicket') {
+                cerrarModal();
+            }
+        });
+
+        // ========================================
+        // FUNCIÓN: Limpiar Formulario
+        // ========================================
+        function limpiarFormulario() {
+            document.getElementById('formRecepcion').reset();
+            document.getElementById('alertVehiculo').style.display = 'none';
+            
+            // Recargar mecánico automático
+            cargarMecanicoAutomatico();
+            
+            // Desbloquear campos de vehículo
+            ['marca', 'modelo', 'anio', 'color'].forEach(id => {
+                document.getElementById(id).readOnly = false;
+            });
+        }
+
+        // ========================================
+        // FUNCIÓN: Submit del Formulario
+        // ========================================
+        document.getElementById('formRecepcion').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Aquí puedes agregar la lógica para guardar en localStorage
+            const datos = {
+                id: Date.now(),
+                clienteNombre: document.getElementById('clienteNombre').value,
+                clienteTelefono: document.getElementById('clienteTelefono').value,
+                patente: document.getElementById('patente').value,
+                marca: document.getElementById('marca').value,
+                modelo: document.getElementById('modelo').value,
+                anio: document.getElementById('anio').value,
+                color: document.getElementById('color').value,
+                descripcion: document.getElementById('descripcion').value,
+                mecanico: document.getElementById('mecanico').value,
+                precioTotal: document.getElementById('precioTotal').value,
+                metodoPago: document.getElementById('metodoPago').value,
+                fecha: new Date().toISOString(),
+                estado: 'pendiente'
+            };
+
+            console.log('Orden creada:', datos);
+            
+            // Guardar en localStorage (opcional)
+            const ordenes = JSON.parse(localStorage.getItem('ordenes') || '[]');
+            ordenes.push(datos);
+            localStorage.setItem('ordenes', JSON.stringify(ordenes));
+
+            alert('✅ Orden creada exitosamente');
+            limpiarFormulario();
+        });
+    </script>
+</body>
+</html>

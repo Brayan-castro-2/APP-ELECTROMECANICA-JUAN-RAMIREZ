@@ -1,0 +1,717 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/auth-context';
+import { actualizarOrden, buscarVehiculoPorPatente, obtenerOrdenPorId, obtenerPerfiles, type OrdenDB, type VehiculoDB, type PerfilDB } from '@/lib/storage-adapter';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { ArrowLeft, CheckCircle, Download, Loader2, Printer, Save } from 'lucide-react';
+import Link from 'next/link';
+
+export default function OrdenesCleanPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
+    const { user, isLoading: authLoading } = useAuth();
+
+    const orderIdParam = searchParams.get('id');
+    const orderId = Number(orderIdParam);
+
+    const [order, setOrder] = useState<OrdenDB | null>(null);
+    const [vehiculo, setVehiculo] = useState<VehiculoDB | null>(null);
+    const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [precioFinal, setPrecioFinal] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const [descripcion, setDescripcion] = useState('');
+    const [estado, setEstado] = useState('pendiente');
+    const [asignadoA, setAsignadoA] = useState<string>('');
+    const [detalleTrabajos, setDetalleTrabajos] = useState('');
+    const [kmIngreso, setKmIngreso] = useState<string>('');
+    const [kmSalida, setKmSalida] = useState<string>('');
+    const [clienteNombre, setClienteNombre] = useState<string>('');
+    const [clienteTelefono, setClienteTelefono] = useState<string>('');
+    const [metodosPago, setMetodosPago] = useState<Array<{ metodo: string; monto: number }>>([]);
+
+    const canViewPrices = user?.name?.toLowerCase().includes('juan');
+
+    const parsePrecio = (value: string) => {
+        const digits = value.replace(/[^0-9]/g, '');
+        return digits ? Number(digits) : 0;
+    };
+
+    const formatPrecio = (value: number) => {
+        return value.toLocaleString('es-CL');
+    };
+
+    useEffect(() => {
+        if (authLoading) return;
+        if (!user) {
+            router.push('/login');
+        }
+    }, [authLoading, user, router]);
+
+    useEffect(() => {
+        if (!Number.isFinite(orderId)) {
+            setIsLoading(false);
+            setOrder(null);
+            setVehiculo(null);
+            return;
+        }
+
+        const loadData = async () => {
+            const [ordenData, perfs] = await Promise.all([
+                obtenerOrdenPorId(orderId),
+                obtenerPerfiles()
+            ]);
+
+            setOrder(ordenData);
+            setPerfiles(perfs);
+
+            if (ordenData) {
+                setPrecioFinal(formatPrecio(ordenData.precio_total || 0));
+                setDescripcion(ordenData.descripcion_ingreso);
+                setEstado(ordenData.estado);
+                setAsignadoA(ordenData.asignado_a || '');
+                setDetalleTrabajos(ordenData.detalle_trabajos || '');
+                setClienteNombre(ordenData.cliente_nombre || '');
+                setClienteTelefono(ordenData.cliente_telefono || '');
+                setMetodosPago(ordenData.metodos_pago || []);
+
+                const servicios = ordenData.descripcion_ingreso || '';
+                const kmMatch = servicios.match(/KM:\s*(\d+\.?\d*)/);
+                const kmSalidaMatch = servicios.match(/→\s*(\d+\.?\d*)/);
+                if (kmMatch) setKmIngreso(kmMatch[1]);
+                if (kmSalidaMatch) setKmSalida(kmSalidaMatch[1]);
+
+                const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
+                setVehiculo(veh);
+            }
+            setIsLoading(false);
+        };
+
+        setIsLoading(true);
+        loadData();
+    }, [orderId]);
+
+    const handlePrint = () => {
+        if (!Number.isFinite(orderId)) return;
+        window.open(`/print/orden/${orderId}`, '_blank');
+    };
+
+    const handleTicket = () => {
+        if (!Number.isFinite(orderId)) return;
+        window.open(`/print/ticket/${orderId}`, '_blank');
+    };
+
+    const handleDownloadPDF = async () => {
+        if (!order) return;
+
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const jsPDF = (await import('jspdf')).default;
+
+            const content = document.createElement('div');
+            content.style.width = '800px';
+            content.style.padding = '40px';
+            content.style.backgroundColor = '#ffffff';
+            content.style.color = '#000000';
+            content.style.fontFamily = 'Arial, sans-serif';
+
+            content.innerHTML = `
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">ELECTROMECÁNICA JR</h1>
+                    <p style="font-size: 14px; color: #666;">Orden de Trabajo #${order.id}</p>
+                    <p style="font-size: 12px; color: #666;">${new Date(order.fecha_ingreso).toLocaleString('es-CL')}</p>
+                </div>
+
+                <div style="border: 2px solid #333; padding: 20px; margin-bottom: 20px;">
+                    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px;">INFORMACIÓN DEL VEHÍCULO</h2>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Patente:</strong> ${order.patente_vehiculo}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Vehículo:</strong> ${vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-'}
+                    </div>
+                    ${vehiculo?.anio ? `<div style="margin-bottom: 10px;"><strong>Año:</strong> ${vehiculo.anio}</div>` : ''}
+                    ${vehiculo?.motor ? `<div style="margin-bottom: 10px;"><strong>Motor:</strong> ${vehiculo.motor}</div>` : ''}
+                </div>
+
+                <div style="border: 2px solid #333; padding: 20px; margin-bottom: 20px;">
+                    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px;">DETALLES DE LA ORDEN</h2>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Estado:</strong> ${order.estado}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Precio Final:</strong> $${(order.precio_total || 0).toLocaleString('es-CL')}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Motivo:</strong>
+                        <div style="margin-top: 5px; white-space: pre-wrap;">${order.descripcion_ingreso}</div>
+                    </div>
+                    ${order.detalles_vehiculo ? `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Detalles del Vehículo:</strong>
+                        <div style="margin-top: 5px; white-space: pre-wrap;">${order.detalles_vehiculo}</div>
+                    </div>
+                    ` : ''}
+                </div>
+
+                ${order.fotos?.length ? `
+                <div style="border: 2px solid #333; padding: 20px; margin-bottom: 20px;">
+                    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px;">IMÁGENES</h2>
+                    <div id="images-container" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        ${order.fotos.map((src, idx) => `
+                            <div style="border: 1px solid #ddd; padding: 10px;">
+                                <img src="${src}" alt="Foto ${idx + 1}" style="width: 100%; height: auto; max-height: 300px; object-fit: contain;" crossorigin="anonymous" />
+                                <p style="text-align: center; margin-top: 5px; font-size: 12px; color: #666;">Foto ${idx + 1}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            `;
+
+            document.body.appendChild(content);
+
+            const canvas = await html2canvas(content, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+            });
+
+            document.body.removeChild(content);
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pdfWidth;
+            const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pdfHeight;
+            }
+
+            pdf.save(`Orden_${order.id}_${order.patente_vehiculo}.pdf`);
+        } catch (error) {
+            console.error('Error generando PDF:', error);
+            alert('Error al generar el PDF. Por favor intenta nuevamente.');
+        }
+    };
+
+    const handleGuardarTodo = async () => {
+        if (!order) return;
+        if (user?.role !== 'admin') return;
+
+        const precio = parsePrecio(precioFinal);
+        if (precio < 0) {
+            alert('El precio no puede ser negativo');
+            return;
+        }
+
+        // Validar métodos de pago si hay alguno
+        if (metodosPago.length > 0) {
+            const totalPagos = metodosPago.reduce((sum, mp) => sum + mp.monto, 0);
+            if (totalPagos !== precio) {
+                alert(`La suma de los métodos de pago ($${totalPagos.toLocaleString('es-CL')}) debe ser igual al precio total ($${precio.toLocaleString('es-CL')})`);
+                return;
+            }
+        }
+
+        let descripcionActualizada = descripcion;
+        if (kmIngreso && kmSalida) {
+            const precioKm = precio > 0 ? precio : 15000;
+            descripcionActualizada = `${descripcion}\n\nServicios:\n- KM: ${kmIngreso} KM → ${kmSalida} KM: $${precioKm.toLocaleString('es-CL')}`;
+        }
+
+        setIsSaving(true);
+
+        // PREPARAR PAYLOAD: Usar any para permitir nulls explícitos en campos opcionales
+        const updateData: any = {
+            descripcion_ingreso: descripcion,
+            estado,
+            precio_total: parsePrecio(precioFinal),
+            cliente_nombre: clienteNombre || null,
+            cliente_telefono: clienteTelefono || null,
+            metodos_pago: metodosPago.length > 0 ? metodosPago : null,
+            asignado_a: asignadoA || null,
+            detalle_trabajos: detalleTrabajos || null,
+        };
+
+        // LÓGICA DE FECHAS
+        // 1. Si se marca como completada, establecer fecha de entrega y fecha completada
+        if (estado === 'completada') {
+            const now = new Date().toISOString();
+            // Solo establecer fechas si no existen, o actualizarlas? 
+            // Para asegurar consistencia, actualizamos a ahora.
+            updateData.fecha_entrega = now;
+            updateData.fecha_completada = now;
+            updateData.fecha_lista = now;
+        }
+        // 2. Si se cambia de completada a pendiente, LIMPIAR fechas explícitamente (null)
+        else if (estado === 'pendiente' && order.estado === 'completada') {
+            console.log('🔄 Revertiendo estado a Pendiente: Limpiando fechas');
+            updateData.fecha_entrega = null;
+            updateData.fecha_completada = null;
+            updateData.fecha_lista = null;
+        }
+
+        console.log('📤 Enviando actualización:', updateData);
+
+        const updated = await actualizarOrden(order.id, updateData);
+
+        if (updated) {
+            setOrder(updated);
+            setPrecioFinal(formatPrecio(updated.precio_total || 0));
+            // Actualizar estado local para que el select muestre el valor correcto
+            setEstado(updated.estado);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2500);
+
+            // ACTUALIZACIÓN OPTIMISTA / MANUAL DE CACHÉ
+            // Actualizamos directamente la lista en caché para que al volver sea instantáneo
+            // sin esperar a que el servidor responda al refetch.
+            queryClient.setQueryData<OrdenDB[]>(['orders'], (oldOrders) => {
+                if (!oldOrders) return [updated];
+                return oldOrders.map(o => o.id === updated.id ? updated : o);
+            });
+
+            // Invalidar caché para asegurar consistencia final
+            await queryClient.invalidateQueries({ queryKey: ['orders'] });
+        }
+        setIsSaving(false);
+    };
+
+    const handleMarcarListo = async () => {
+        if (!order) return;
+        if (user?.role !== 'admin') return;
+
+        setIsSaving(true);
+        const now = new Date().toISOString();
+        const updated = await actualizarOrden(order.id, {
+            estado: 'completada',
+            fecha_lista: now,
+            fecha_completada: now,
+            fecha_entrega: now,
+        });
+        if (updated) {
+            console.log('✅ Orden actualizada:', updated);
+            setOrder(updated);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2500);
+
+            // ACTUALIZACIÓN OPTIMISTA / MANUAL DE CACHÉ
+            queryClient.setQueryData<OrdenDB[]>(['orders'], (oldOrders) => {
+                if (!oldOrders) return [updated];
+                return oldOrders.map(o => o.id === updated.id ? updated : o);
+            });
+
+            // Invalidar caché para actualizar lista de órdenes inmediatamente
+            await queryClient.invalidateQueries({ queryKey: ['orders'] });
+        } else {
+            console.error('❌ Error: No se pudo actualizar la orden');
+            alert('Error al actualizar el estado. Por favor intenta de nuevo.');
+        }
+        setIsSaving(false);
+    };
+
+    if (authLoading || isLoading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
+    if (!Number.isFinite(orderId)) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-slate-400 mb-4">Selecciona una orden</p>
+                <Link href="/admin/ordenes">
+                    <Button variant="outline" className="border-slate-600 text-slate-300">
+                        Volver a órdenes
+                    </Button>
+                </Link>
+            </div>
+        );
+    }
+
+    if (!order) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-slate-400 mb-4">Orden no encontrada</p>
+                <Link href="/admin/ordenes">
+                    <Button variant="outline" className="border-slate-600 text-slate-300">
+                        Volver a órdenes
+                    </Button>
+                </Link>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 max-w-3xl mx-auto">
+            {saveSuccess && (
+                <div className="fixed top-20 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-50">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5" />
+                        Cambios guardados
+                    </div>
+                </div>
+            )}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl md:text-2xl font-bold text-white">Orden #{order.id}</h1>
+                    <p className="text-sm text-slate-400">{new Date(order.fecha_ingreso).toLocaleString('es-CL')}</p>
+                </div>
+                <div className="flex gap-2">
+                    {user?.role === 'admin' ? (
+                        <Button onClick={handleTicket} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                            <Printer className="w-4 h-4 mr-2" />
+                            <span className="hidden sm:inline">Boleta/Ticket</span>
+                        </Button>
+                    ) : null}
+                    <Button onClick={handleDownloadPDF} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                        <Download className="w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">PDF</span>
+                    </Button>
+                    <Button onClick={handlePrint} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                        <Printer className="w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">Imprimir Orden</span>
+                    </Button>
+                </div>
+            </div>
+
+            <Card className="bg-slate-800/50 border-slate-700/50">
+                <CardHeader>
+                    <CardTitle className="text-white">Detalles de la Orden</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Patente</span>
+                        <span className="font-mono font-bold text-white">{order.patente_vehiculo}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Vehículo</span>
+                        <span className="text-white">{vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-'}</span>
+                    </div>
+                    {user?.role === 'admin' && (
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Nombre del Cliente</Label>
+                                <Input
+                                    value={clienteNombre}
+                                    onChange={(e) => setClienteNombre(e.target.value)}
+                                    className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                    placeholder="Nombre del cliente"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Teléfono del Cliente</Label>
+                                <Input
+                                    value={clienteTelefono}
+                                    onChange={(e) => setClienteTelefono(e.target.value)}
+                                    className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                    placeholder="+56 9 1234 5678"
+                                />
+                            </div>
+                        </div>
+                    )}
+                    {user?.role === 'admin' ? (
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Estado</Label>
+                                <Select value={estado} onValueChange={setEstado}>
+                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                        <SelectItem value="pendiente" className="text-slate-200">Pendiente</SelectItem>
+                                        <SelectItem value="completada" className="text-slate-200">Completada</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Asignado a</Label>
+                                <Select value={asignadoA || 'none'} onValueChange={(v) => setAsignadoA(v === 'none' ? '' : v)}>
+                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl">
+                                        <SelectValue placeholder="Seleccionar mecánico" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                        <SelectItem value="none" className="text-slate-200">Sin asignar</SelectItem>
+                                        {perfiles.filter(p => p.rol === 'mecanico' || p.rol === 'admin').map((perfil) => (
+                                            <SelectItem key={perfil.id} value={perfil.id} className="text-slate-200">
+                                                {perfil.nombre_completo}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Estado</span>
+                            <Badge className="bg-slate-700/50 text-slate-200 border border-slate-600">{order.estado}</Badge>
+                        </div>
+                    )}
+                    {user?.role === 'admin' ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Motivo de Ingreso</Label>
+                                <Textarea
+                                    value={descripcion}
+                                    onChange={(e) => setDescripcion(e.target.value)}
+                                    className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                    placeholder="Describe el motivo de ingreso del vehículo..."
+                                />
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-slate-300">KM Ingreso</Label>
+                                    <Input
+                                        type="number"
+                                        value={kmIngreso}
+                                        onChange={(e) => setKmIngreso(e.target.value)}
+                                        className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                        placeholder="150000"
+                                        min="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-slate-300">KM Salida</Label>
+                                    <Input
+                                        type="number"
+                                        value={kmSalida}
+                                        onChange={(e) => setKmSalida(e.target.value)}
+                                        className="bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                        placeholder="130000"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Detalle de Trabajos Realizados</Label>
+                                <Textarea
+                                    value={detalleTrabajos}
+                                    onChange={(e) => setDetalleTrabajos(e.target.value)}
+                                    className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
+                                    placeholder="Describe los trabajos realizados en el vehículo..."
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-slate-300">Precio Total ($)</Label>
+                                <Input
+                                    value={precioFinal}
+                                    onChange={(e) => setPrecioFinal(e.target.value)}
+                                    onBlur={() => setPrecioFinal(formatPrecio(parsePrecio(precioFinal)))}
+                                    inputMode="numeric"
+                                    className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-lg font-semibold"
+                                    placeholder="15000"
+                                />
+                                <p className="text-xs text-slate-400">Precio en pesos chilenos</p>
+                            </div>
+
+                            {/* Métodos de Pago */}
+                            <div className="space-y-3 border-t border-slate-700 pt-4">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-slate-300 text-base">Métodos de Pago</Label>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => setMetodosPago([...metodosPago, { metodo: 'efectivo', monto: 0 }])}
+                                        className="bg-slate-600 hover:bg-slate-500 text-white rounded-lg"
+                                    >
+                                        + Agregar Método
+                                    </Button>
+                                </div>
+
+                                {metodosPago.length > 0 && (
+                                    <div className="space-y-2">
+                                        {metodosPago.map((mp, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center bg-slate-700/30 p-3 rounded-lg">
+                                                <Select
+                                                    value={mp.metodo}
+                                                    onValueChange={(value) => {
+                                                        const updated = [...metodosPago];
+                                                        updated[idx].metodo = value;
+                                                        setMetodosPago(updated);
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-[140px] bg-slate-700 border-slate-600 text-white rounded-lg">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                                        <SelectItem value="efectivo" className="text-slate-200">Efectivo</SelectItem>
+                                                        <SelectItem value="debito" className="text-slate-200">Débito</SelectItem>
+                                                        <SelectItem value="credito" className="text-slate-200">Crédito</SelectItem>
+                                                        <SelectItem value="transferencia" className="text-slate-200">Transferencia</SelectItem>
+                                                        <SelectItem value="debe" className="text-slate-200">Debe (Deuda)</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <Input
+                                                    type="text"
+                                                    value={mp.monto > 0 ? formatPrecio(mp.monto) : ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...metodosPago];
+                                                        updated[idx].monto = parsePrecio(e.target.value);
+                                                        setMetodosPago(updated);
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        const updated = [...metodosPago];
+                                                        updated[idx].monto = parsePrecio(e.target.value);
+                                                        setMetodosPago(updated);
+                                                        e.target.value = formatPrecio(updated[idx].monto);
+                                                    }}
+                                                    placeholder="Monto"
+                                                    className="flex-1 bg-slate-700 border-slate-600 text-white rounded-lg"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        const updated = metodosPago.filter((_, i) => i !== idx);
+                                                        setMetodosPago(updated);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                >
+                                                    ✕
+                                                </Button>
+                                            </div>
+                                        ))}
+                                        <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-700">
+                                            <span className="text-slate-400">Total pagos:</span>
+                                            <span className="text-white font-semibold">
+                                                ${formatPrecio(metodosPago.reduce((sum, mp) => sum + mp.monto, 0))}
+                                            </span>
+                                        </div>
+                                        {metodosPago.length > 0 && parsePrecio(precioFinal) > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-400">Precio total:</span>
+                                                <span className="text-white font-semibold">${precioFinal}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <Button
+                                    onClick={handleGuardarTodo}
+                                    disabled={isSaving}
+                                    className="bg-blue-600 hover:bg-blue-700 rounded-xl"
+                                >
+                                    {isSaving ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Guardando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="w-4 h-4 mr-2" />
+                                            Guardar Cambios
+                                        </>
+                                    )}
+                                </Button>
+                                <Link href="/admin/ordenes">
+                                    <Button
+                                        variant="outline"
+                                        className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl"
+                                    >
+                                        <ArrowLeft className="w-4 h-4 mr-2" />
+                                        Volver a Órdenes
+                                    </Button>
+                                </Link>
+                            </div>
+
+                            {/* Botones de Boleta, PDF e Imprimir - Aparecen solo después de guardar */}
+                            {saveSuccess && (
+                                <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-slate-700">
+                                    {user?.role === 'admin' && (
+                                        <Button onClick={handleTicket} variant="outline" className="flex-1 sm:flex-none border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                                            <Printer className="w-4 h-4 mr-2" />
+                                            Boleta/Ticket
+                                        </Button>
+                                    )}
+                                    <Button onClick={handleDownloadPDF} variant="outline" className="flex-1 sm:flex-none border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Descargar PDF
+                                    </Button>
+                                    <Button onClick={handlePrint} variant="outline" className="flex-1 sm:flex-none border-slate-600 text-slate-300 hover:bg-slate-700 rounded-xl">
+                                        <Printer className="w-4 h-4 mr-2" />
+                                        Imprimir Orden
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-400">Precio Final</span>
+                                <span className="text-white font-bold">${(order.precio_total || 0).toLocaleString('es-CL')}</span>
+                            </div>
+                            <div className="pt-2">
+                                <p className="text-slate-400 text-sm mb-1">Motivo</p>
+                                <p className="text-white whitespace-pre-wrap">{order.descripcion_ingreso}</p>
+                            </div>
+                        </>
+                    )}
+
+                    {order.detalles_vehiculo ? (
+                        <div className="pt-2">
+                            <p className="text-slate-400 text-sm mb-1">Detalles del Vehículo</p>
+                            <p className="text-white whitespace-pre-wrap">{order.detalles_vehiculo}</p>
+                        </div>
+                    ) : null}
+
+                    {order.fotos?.length ? (
+                        <div className="pt-2">
+                            <p className="text-slate-400 text-sm mb-2">Imágenes</p>
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                                {order.fotos.map((src, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => window.open(src, '_blank')}
+                                        className="rounded-xl border border-slate-700 bg-slate-800/30 p-2 hover:bg-slate-800/50"
+                                    >
+                                        <img src={src} alt={`foto-${idx}`} className="h-28 w-full rounded-lg object-cover" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}

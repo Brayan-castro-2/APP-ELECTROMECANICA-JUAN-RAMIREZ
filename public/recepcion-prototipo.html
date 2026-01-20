@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nueva Orden de Trabajo</title>
+  <style>
+    :root{
+      --bg:#f3f4f6;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#e5e7eb;
+      --primary:#1d4ed8;
+      --primary-2:#0b3aa4;
+      --success:#16a34a;
+      --danger:#ef4444;
+      --shadow:0 10px 30px rgba(2,6,23,.08);
+      --radius:14px;
+      --touch:14px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    .wrap{
+      max-width:980px;
+      margin:0 auto;
+      padding:24px 16px 80px;
+    }
+
+    header{
+      background:linear-gradient(135deg,var(--primary),var(--primary-2));
+      color:#fff;
+      border-radius:var(--radius);
+      padding:22px;
+      box-shadow:var(--shadow);
+      position:sticky;
+      top:12px;
+      z-index:10;
+    }
+
+    header h1{
+      margin:0;
+      font-size:24px;
+      letter-spacing:.2px;
+    }
+
+    header p{
+      margin:8px 0 0;
+      opacity:.9;
+      font-size:14px;
+    }
+
+    .grid{
+      display:grid;
+      gap:16px;
+      margin-top:16px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      padding:18px;
+      box-shadow:0 1px 0 rgba(2,6,23,.02);
+    }
+
+    .card h2{
+      margin:0 0 14px;
+      font-size:14px;
+      letter-spacing:.6px;
+      text-transform:uppercase;
+      color:#111827;
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+    }
+
+    .row-vehiculo{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:12px;
+      align-items:end;
+    }
+
+    @media (max-width:780px){
+      header{position:static}
+      .row{grid-template-columns:1fr}
+      .row-vehiculo{grid-template-columns:1fr}
+    }
+
+    label{
+      display:block;
+      font-weight:650;
+      font-size:13px;
+      color:#111827;
+      margin:0 0 8px;
+    }
+
+    .hint{
+      font-size:12px;
+      color:var(--muted);
+      margin-top:8px;
+    }
+
+    input, textarea{
+      width:100%;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:14px 14px;
+      font-size:16px;
+      background:#fff;
+      color:var(--text);
+      outline:none;
+      transition:border-color .15s, box-shadow .15s;
+    }
+
+    textarea{min-height:92px; resize:vertical}
+
+    input:focus, textarea:focus{
+      border-color:rgba(29,78,216,.55);
+      box-shadow:0 0 0 4px rgba(29,78,216,.12);
+    }
+
+    input[readonly]{
+      background:#f8fafc;
+      color:#0f172a;
+    }
+
+    .patente{
+      text-transform:uppercase;
+      letter-spacing:1px;
+      font-weight:800;
+      text-align:center;
+      font-size:22px;
+      padding:16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      border:1px solid transparent;
+      border-radius:12px;
+      padding:14px 16px;
+      font-weight:750;
+      font-size:15px;
+      cursor:pointer;
+      user-select:none;
+      transition:transform .06s, background .15s, border-color .15s, opacity .15s;
+      min-height:48px;
+      white-space:nowrap;
+    }
+
+    .btn:active{transform:translateY(1px)}
+
+    .btn-primary{background:var(--primary); color:#fff}
+    .btn-primary:hover{background:var(--primary-2)}
+
+    .btn-success{background:var(--success); color:#fff}
+    .btn-success:hover{filter:brightness(.95)}
+
+    .btn-ghost{background:#fff; border-color:var(--border); color:#111827}
+    .btn-ghost:hover{background:#f8fafc}
+
+    .btn-danger{background:var(--danger); color:#fff}
+    .btn-danger:hover{filter:brightness(.95)}
+
+    .btn-block{width:100%}
+
+    .pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding:10px 12px;
+      border-radius:999px;
+      background:#eff6ff;
+      color:#1d4ed8;
+      font-weight:700;
+      font-size:13px;
+      border:1px solid rgba(29,78,216,.15);
+    }
+
+    .vehiculo-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+
+    @media (max-width:780px){
+      .vehiculo-grid{grid-template-columns:1fr}
+    }
+
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+    }
+
+    thead th{
+      text-align:left;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.7px;
+      color:var(--muted);
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+    }
+
+    tbody td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+      vertical-align:top;
+    }
+
+    tbody tr:last-child td{border-bottom:none}
+
+    .cell-actions{
+      width:110px;
+      text-align:right;
+    }
+
+    .svc-desc{min-width:220px}
+    .svc-price{width:140px}
+
+    .svc-input{
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      font-size:15px;
+      width:100%;
+    }
+
+    .total{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-top:14px;
+      padding:14px;
+      border-radius:12px;
+      border:1px dashed rgba(15,23,42,.18);
+      background:#f8fafc;
+    }
+
+    .total strong{
+      font-size:18px;
+    }
+
+    footer.actions{
+      position:fixed;
+      left:0;
+      right:0;
+      bottom:0;
+      background:rgba(243,244,246,.92);
+      backdrop-filter: blur(8px);
+      border-top:1px solid var(--border);
+      padding:12px;
+    }
+
+    footer .actions-inner{
+      max-width:980px;
+      margin:0 auto;
+      display:flex;
+      gap:12px;
+      padding:0 16px;
+    }
+
+    @media (max-width:780px){
+      footer .actions-inner{flex-direction:column}
+    }
+
+    /* Modal */
+    .overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(2,6,23,.72);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      z-index:999;
+    }
+
+    .overlay.open{display:flex}
+
+    .modal{
+      width:min(92vw, 360px);
+      background:#fff;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 25px 70px rgba(0,0,0,.45);
+    }
+
+    .ticket-view{
+      font-family:'Courier New', monospace;
+      width:300px;
+      max-width:100%;
+      margin:0 auto;
+      color:#000;
+      padding:18px 16px;
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    .ticket-center{text-align:center}
+    .ticket-hr{margin:10px 0; white-space:pre;}
+
+    .ticket-row{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .ticket-row span:last-child{text-align:right}
+
+    .modal-actions{
+      display:flex;
+      gap:10px;
+      padding:12px;
+      background:#f8fafc;
+      border-top:1px solid var(--border);
+    }
+
+    .modal-actions .btn{flex:1; padding:12px 10px; min-height:44px; font-size:14px}
+
+    @media print{
+      body *{visibility:hidden}
+      #ticketOverlay, #ticketOverlay *{visibility:visible}
+      #ticketOverlay{display:flex; background:#fff; position:fixed; inset:0; padding:0; align-items:flex-start; justify-content:center}
+      .modal{box-shadow:none; border-radius:0}
+      .modal-actions{display:none}
+      header, footer.actions{display:none}
+      .ticket-view{width:300px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Nueva Orden de Trabajo</h1>
+      <p id="fechaHora">Cargando fecha y hora...</p>
+    </header>
+
+    <div class="grid">
+      <section class="card" aria-label="Responsables">
+        <h2>Responsables</h2>
+        <div>
+          <label for="mecanico">Mecánico Responsable</label>
+          <input id="mecanico" type="text" readonly value="Técnico en Turno" />
+          <div class="hint">Se completa automáticamente con el usuario actual (si existe).</div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Vehículo">
+        <h2>Vehículo</h2>
+
+        <div class="row-vehiculo">
+          <div>
+            <label for="patente">Patente</label>
+            <input id="patente" class="patente" type="text" inputmode="text" placeholder="AA-BB-11" maxlength="6" />
+            <div class="hint">Ejemplos: PROFE1, BBBB10, TEST01</div>
+          </div>
+          <button id="btnBuscar" class="btn btn-primary btn-block" type="button">🔍 Buscar</button>
+        </div>
+
+        <div id="estadoBusqueda" class="hint" style="margin-top:10px"></div>
+
+        <div class="vehiculo-grid">
+          <div>
+            <label for="marca">Marca</label>
+            <input id="marca" type="text" readonly />
+          </div>
+          <div>
+            <label for="modelo">Modelo</label>
+            <input id="modelo" type="text" readonly />
+          </div>
+          <div>
+            <label for="anio">Año</label>
+            <input id="anio" type="text" readonly />
+          </div>
+          <div>
+            <label for="motor">Motor</label>
+            <input id="motor" type="text" readonly />
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Cliente">
+        <h2>Cliente</h2>
+        <div class="row">
+          <div>
+            <label for="clienteNombre">Nombre</label>
+            <input id="clienteNombre" type="text" placeholder="Nombre del cliente" />
+          </div>
+          <div>
+            <label for="clienteWhatsapp">WhatsApp</label>
+            <input id="clienteWhatsapp" type="tel" inputmode="numeric" placeholder="569XXXXXXXX" />
+            <div class="hint">Usa formato internacional sin + (ej: 56912345678).</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Servicios">
+        <h2>Servicios</h2>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+          <span class="pill">Servicios / Repuestos</span>
+          <button id="btnAgregar" class="btn btn-ghost" type="button">+ Agregar Servicio</button>
+        </div>
+
+        <div style="overflow:auto; border:1px solid var(--border); border-radius:12px;">
+          <table aria-label="Tabla de servicios">
+            <thead>
+              <tr>
+                <th class="svc-desc">Descripción</th>
+                <th class="svc-price">Precio ($)</th>
+                <th class="cell-actions">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyServicios"></tbody>
+          </table>
+        </div>
+
+        <div class="total">
+          <div>
+            <div style="font-size:12px; color:var(--muted); font-weight:700;">Total estimado</div>
+            <strong id="totalTexto">TOTAL: $0</strong>
+          </div>
+          <button id="btnAgregar2" class="btn btn-primary" type="button">+ Agregar Servicio</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="actions">
+    <div class="actions-inner">
+      <button id="btnGenerar" class="btn btn-success">📄 Generar Orden y Ticket</button>
+      <button id="btnLimpiar" class="btn btn-ghost">🗑️ Limpiar</button>
+    </div>
+  </footer>
+
+  <div id="ticketOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="Ticket">
+    <div class="modal">
+      <div id="ticketView" class="ticket-view"></div>
+      <div class="modal-actions">
+        <button id="btnPrint" class="btn btn-primary" type="button">Imprimir</button>
+        <button id="btnWA" class="btn btn-success" type="button">Enviar WhatsApp</button>
+        <button id="btnCerrar" class="btn btn-ghost" type="button">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MOCK_DB = {
+      "PROFE1": { marca: "Nissan", modelo: "V16", anio: "2010", motor: "1.6 Twin Cam" },
+      "BBBB10": { marca: "Toyota", modelo: "Yaris", anio: "2018", motor: "1.5" },
+      "TEST01": { marca: "Chevrolet", modelo: "Sail", anio: "2020", motor: "1.4" }
+    };
+
+    const el = {
+      fechaHora: document.getElementById('fechaHora'),
+      mecanico: document.getElementById('mecanico'),
+      patente: document.getElementById('patente'),
+      btnBuscar: document.getElementById('btnBuscar'),
+      estadoBusqueda: document.getElementById('estadoBusqueda'),
+      marca: document.getElementById('marca'),
+      modelo: document.getElementById('modelo'),
+      anio: document.getElementById('anio'),
+      motor: document.getElementById('motor'),
+      clienteNombre: document.getElementById('clienteNombre'),
+      clienteWhatsapp: document.getElementById('clienteWhatsapp'),
+      tbodyServicios: document.getElementById('tbodyServicios'),
+      totalTexto: document.getElementById('totalTexto'),
+      btnAgregar: document.getElementById('btnAgregar'),
+      btnAgregar2: document.getElementById('btnAgregar2'),
+      btnGenerar: document.getElementById('btnGenerar'),
+      btnLimpiar: document.getElementById('btnLimpiar'),
+      overlay: document.getElementById('ticketOverlay'),
+      ticketView: document.getElementById('ticketView'),
+      btnPrint: document.getElementById('btnPrint'),
+      btnWA: document.getElementById('btnWA'),
+      btnCerrar: document.getElementById('btnCerrar')
+    };
+
+    function nowCL() {
+      return new Date().toLocaleString('es-CL', {
+        weekday: 'long',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    function updateFechaHora() {
+      el.fechaHora.textContent = nowCL();
+    }
+
+    function loadMecanico() {
+      const raw = localStorage.getItem('usuario_actual');
+      let nombre = 'Técnico en Turno';
+      if (raw) {
+        try {
+          const u = JSON.parse(raw);
+          nombre = u?.nombre_completo || u?.nombre || u?.email || nombre;
+        } catch {
+          nombre = raw;
+        }
+      }
+      el.mecanico.value = nombre;
+      el.mecanico.readOnly = true;
+    }
+
+    function normalizePatente(v) {
+      return String(v || '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 6);
+    }
+
+    function setVehiculoReadonly(isReadonly) {
+      [el.marca, el.modelo, el.anio, el.motor].forEach(i => {
+        i.readOnly = isReadonly;
+        if (!isReadonly) i.value = i.value || '';
+      });
+    }
+
+    function clearVehiculo() {
+      el.marca.value = '';
+      el.modelo.value = '';
+      el.anio.value = '';
+      el.motor.value = '';
+    }
+
+    function buscarPatente() {
+      const p = normalizePatente(el.patente.value);
+      el.patente.value = p;
+
+      if (!p) {
+        el.estadoBusqueda.textContent = '';
+        clearVehiculo();
+        setVehiculoReadonly(true);
+        return;
+      }
+
+      const found = MOCK_DB[p];
+
+      if (found) {
+        el.marca.value = found.marca;
+        el.modelo.value = found.modelo;
+        el.anio.value = found.anio;
+        el.motor.value = found.motor;
+        setVehiculoReadonly(true);
+        el.estadoBusqueda.textContent = `Vehículo encontrado: ${found.marca} ${found.modelo} (${found.anio})`;
+      } else {
+        clearVehiculo();
+        setVehiculoReadonly(false);
+        el.estadoBusqueda.textContent = 'No se encontró la patente. Completa los datos manualmente.';
+        el.marca.focus();
+      }
+    }
+
+    function moneyCL(n) {
+      const num = Number(n || 0);
+      return num.toLocaleString('es-CL');
+    }
+
+    function parsePrice(v) {
+      const cleaned = String(v || '').replace(/[^0-9]/g, '');
+      return cleaned ? Number(cleaned) : 0;
+    }
+
+    function calcularTotal() {
+      const prices = Array.from(document.querySelectorAll('input[data-svc-price]'));
+      const total = prices.reduce((acc, input) => acc + parsePrice(input.value), 0);
+      el.totalTexto.textContent = `TOTAL: $${moneyCL(total)}`;
+      return total;
+    }
+
+    function agregarFila(prefill) {
+      const tr = document.createElement('tr');
+
+      const tdDesc = document.createElement('td');
+      const tdPrice = document.createElement('td');
+      const tdAct = document.createElement('td');
+      tdAct.className = 'cell-actions';
+
+      const inDesc = document.createElement('input');
+      inDesc.className = 'svc-input';
+      inDesc.placeholder = 'Ej: Cambio de aceite';
+      inDesc.value = prefill?.descripcion || '';
+
+      const inPrice = document.createElement('input');
+      inPrice.className = 'svc-input';
+      inPrice.placeholder = '0';
+      inPrice.inputMode = 'numeric';
+      inPrice.setAttribute('data-svc-price', '1');
+      inPrice.value = prefill?.precio ? String(prefill.precio) : '';
+
+      inPrice.addEventListener('input', () => {
+        calcularTotal();
+      });
+
+      const btnDel = document.createElement('button');
+      btnDel.type = 'button';
+      btnDel.className = 'btn btn-danger';
+      btnDel.textContent = 'Eliminar';
+      btnDel.style.minHeight = '44px';
+      btnDel.style.padding = '10px 12px';
+      btnDel.addEventListener('click', () => {
+        tr.remove();
+        calcularTotal();
+      });
+
+      tdDesc.appendChild(inDesc);
+      tdPrice.appendChild(inPrice);
+      tdAct.appendChild(btnDel);
+
+      tr.appendChild(tdDesc);
+      tr.appendChild(tdPrice);
+      tr.appendChild(tdAct);
+
+      el.tbodyServicios.appendChild(tr);
+
+      calcularTotal();
+      inDesc.focus();
+    }
+
+    function getServicios() {
+      const rows = Array.from(el.tbodyServicios.querySelectorAll('tr'));
+      return rows
+        .map((tr) => {
+          const inputs = tr.querySelectorAll('input');
+          const desc = inputs[0]?.value?.trim() || '';
+          const price = parsePrice(inputs[1]?.value);
+          return { descripcion: desc, precio: price };
+        })
+        .filter(s => s.descripcion || s.precio);
+    }
+
+    function buildTicketText(data) {
+      const hr = '------------------------------';
+      const lines = [];
+      lines.push('JR - ELECTROMECÁNICA');
+      lines.push(data.fechaHora);
+      lines.push(hr);
+      lines.push(`Mecánico: ${data.mecanico}`);
+      lines.push(hr);
+      lines.push('CLIENTE');
+      lines.push(`Nombre: ${data.clienteNombre || '-'}`);
+      lines.push(`WhatsApp: ${data.clienteWhatsapp || '-'}`);
+      lines.push(hr);
+      lines.push('VEHÍCULO');
+      lines.push(`Patente: ${data.patente || '-'}`);
+      lines.push(`Marca: ${data.marca || '-'}`);
+      lines.push(`Modelo: ${data.modelo || '-'}`);
+      lines.push(`Año: ${data.anio || '-'}`);
+      lines.push(`Motor: ${data.motor || '-'}`);
+      lines.push(hr);
+      lines.push('SERVICIOS');
+      if (data.servicios.length === 0) {
+        lines.push('(Sin servicios ingresados)');
+      } else {
+        data.servicios.forEach((s) => {
+          const left = (s.descripcion || 'Servicio').slice(0, 20);
+          const right = `$${moneyCL(s.precio)}`;
+          lines.push(`${left.padEnd(20, ' ')} ${right}`);
+        });
+      }
+      lines.push(hr);
+      lines.push(`TOTAL: $${moneyCL(data.total)}`);
+      lines.push(hr);
+      lines.push('Gracias por su preferencia');
+      return lines.join('\n');
+    }
+
+    function generarTicket() {
+      const patente = normalizePatente(el.patente.value);
+      const servicios = getServicios();
+      const total = calcularTotal();
+
+      if (!patente) {
+        alert('Ingresa una patente antes de generar el ticket.');
+        el.patente.focus();
+        return;
+      }
+
+      if (!el.marca.value || !el.modelo.value || !el.anio.value || !el.motor.value) {
+        alert('Completa los datos del vehículo (marca, modelo, año, motor).');
+        return;
+      }
+
+      if (servicios.length === 0) {
+        alert('Agrega al menos un servicio (descripción y/o precio).');
+        return;
+      }
+
+      const data = {
+        fechaHora: nowCL(),
+        mecanico: el.mecanico.value.trim() || 'Técnico en Turno',
+        patente,
+        marca: el.marca.value.trim(),
+        modelo: el.modelo.value.trim(),
+        anio: el.anio.value.trim(),
+        motor: el.motor.value.trim(),
+        clienteNombre: el.clienteNombre.value.trim(),
+        clienteWhatsapp: String(el.clienteWhatsapp.value || '').replace(/[^0-9]/g, ''),
+        servicios,
+        total
+      };
+
+      const hr = '<div class="ticket-hr">------------------------------</div>';
+      const svcHtml = data.servicios.map(s => {
+        return `<div class="ticket-row"><span>${escapeHtml(s.descripcion || 'Servicio')}</span><span>$${moneyCL(s.precio)}</span></div>`;
+      }).join('');
+
+      el.ticketView.innerHTML = `
+        <div class="ticket-center" style="font-weight:700; font-size:14px;">JR</div>
+        <div class="ticket-center" style="margin-top:2px;">ELECTROMECÁNICA</div>
+        <div class="ticket-center" style="margin-top:6px;">${escapeHtml(data.fechaHora)}</div>
+        ${hr}
+        <div><strong>Mecánico:</strong> ${escapeHtml(data.mecanico)}</div>
+        ${hr}
+        <div><strong>CLIENTE</strong></div>
+        <div>Nombre: ${escapeHtml(data.clienteNombre || '-')}</div>
+        <div>WhatsApp: ${escapeHtml(data.clienteWhatsapp || '-')}</div>
+        ${hr}
+        <div><strong>VEHÍCULO</strong></div>
+        <div>Patente: <strong>${escapeHtml(data.patente)}</strong></div>
+        <div>Marca: ${escapeHtml(data.marca)}</div>
+        <div>Modelo: ${escapeHtml(data.modelo)}</div>
+        <div>Año: ${escapeHtml(data.anio)}</div>
+        <div>Motor: ${escapeHtml(data.motor)}</div>
+        ${hr}
+        <div><strong>SERVICIOS</strong></div>
+        <div style="margin-top:6px">${svcHtml}</div>
+        ${hr}
+        <div class="ticket-row" style="font-weight:700; font-size:14px;">
+          <span>TOTAL</span>
+          <span>$${moneyCL(data.total)}</span>
+        </div>
+        ${hr}
+        <div class="ticket-center" style="margin-top:8px;">Gracias por su preferencia</div>
+      `;
+
+      window.__ticketData = data;
+      el.overlay.classList.add('open');
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function closeTicket() {
+      el.overlay.classList.remove('open');
+    }
+
+    function enviarWhatsApp() {
+      const data = window.__ticketData;
+      if (!data) return;
+
+      const text = buildTicketText(data);
+      const encoded = encodeURIComponent(text);
+
+      const phone = (data.clienteWhatsapp || '').replace(/[^0-9]/g, '');
+      const url = phone
+        ? `https://wa.me/${phone}?text=${encoded}`
+        : `https://wa.me/?text=${encoded}`;
+
+      window.open(url, '_blank');
+    }
+
+    function limpiar() {
+      el.patente.value = '';
+      el.estadoBusqueda.textContent = '';
+      clearVehiculo();
+      setVehiculoReadonly(true);
+      el.clienteNombre.value = '';
+      el.clienteWhatsapp.value = '';
+      el.tbodyServicios.innerHTML = '';
+      agregarFila();
+      calcularTotal();
+      el.patente.focus();
+    }
+
+    // Events
+    el.btnBuscar.addEventListener('click', buscarPatente);
+    el.patente.addEventListener('input', () => {
+      el.patente.value = normalizePatente(el.patente.value);
+    });
+    el.patente.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        buscarPatente();
+      }
+    });
+
+    el.btnAgregar.addEventListener('click', () => agregarFila());
+    el.btnAgregar2.addEventListener('click', () => agregarFila());
+
+    el.btnGenerar.addEventListener('click', generarTicket);
+    el.btnLimpiar.addEventListener('click', limpiar);
+
+    el.btnPrint.addEventListener('click', () => window.print());
+    el.btnWA.addEventListener('click', enviarWhatsApp);
+    el.btnCerrar.addEventListener('click', closeTicket);
+
+    el.overlay.addEventListener('click', (e) => {
+      if (e.target === el.overlay) closeTicket();
+    });
+
+    // Init
+    loadMecanico();
+    updateFechaHora();
+    setInterval(updateFechaHora, 1000);
+
+    setVehiculoReadonly(true);
+    agregarFila();
+    calcularTotal();
+  </script>
+</body>
+</html>

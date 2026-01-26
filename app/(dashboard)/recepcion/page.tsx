@@ -35,11 +35,7 @@ function formatMilesConPunto(value: string) {
     return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-function buildKmServiceDescripcion(kmActual: string, kmNuevo: string) {
-    const a = kmActual ? `${formatMilesConPunto(kmActual)} KM` : 'KM actual';
-    const n = kmNuevo ? `${formatMilesConPunto(kmNuevo)} KM` : 'KM nuevo';
-    return `KM: ${a} → ${n}`;
-}
+
 
 function normalizePatente(v: string) {
     return String(v || '')
@@ -107,9 +103,9 @@ function RecepcionContent() {
     const [anio, setAnio] = useState('');
     const [motor, setMotor] = useState('');
 
-    const [kmEnabled, setKmEnabled] = useState(false);
     const [kmActual, setKmActual] = useState('');
     const [kmNuevo, setKmNuevo] = useState('');
+    const [kmEnabled, setKmEnabled] = useState(false);
     const [kmServiceIndex, setKmServiceIndex] = useState<number | null>(null);
 
     const [vehiculoLocked, setVehiculoLocked] = useState(false);
@@ -230,6 +226,29 @@ function RecepcionContent() {
         }
         setFocusTarget(null);
     }, [focusTarget, servicios.length]);
+
+    // Update KM service row automatically
+    useEffect(() => {
+        if (kmEnabled && kmActual && kmNuevo) {
+            const descripcionKM = `KM`; // Simplified description
+            setServicios(prev => {
+                const newServicios = [...prev];
+                if (kmServiceIndex !== null && newServicios[kmServiceIndex]) {
+                    newServicios[kmServiceIndex] = { ...newServicios[kmServiceIndex], descripcion: descripcionKM };
+                } else {
+                    const emptyIdx = newServicios.findIndex(s => !s.descripcion);
+                    if (emptyIdx >= 0) {
+                        newServicios[emptyIdx] = { descripcion: descripcionKM, precio: '' };
+                        setKmServiceIndex(emptyIdx);
+                    } else {
+                        newServicios.push({ descripcion: descripcionKM, precio: '' });
+                        setKmServiceIndex(newServicios.length - 1);
+                    }
+                }
+                return newServicios;
+            });
+        }
+    }, [kmEnabled, kmActual, kmNuevo, kmServiceIndex]);
 
     // Check for debts when phone number changes (after typing complete phone)
     useEffect(() => {
@@ -421,106 +440,31 @@ function RecepcionContent() {
         });
     };
 
-    const activarServicioKm = () => {
-        setKmEnabled(true);
-        setServicios((prev) => {
-            const emptyIndex = prev.findIndex((s) => {
-                const d = s.descripcion.trim();
-                const p = parsePrecio(s.precio);
-                return !d && p === 0;
-            });
-
-            const kmDesc = buildKmServiceDescripcion(kmActual, kmNuevo);
-
-            if (emptyIndex >= 0) {
-                const next = prev.map((s, i) => (i === emptyIndex ? { ...s, descripcion: kmDesc } : s));
-                setKmServiceIndex(emptyIndex);
-                return next;
-            }
-
-            const next = [...prev, { descripcion: kmDesc, precio: '' }];
-            const idx = next.length - 1;
-            setKmServiceIndex(idx);
-            return next;
-        });
-
-        // Auto-focus en KM Actual después de que el DOM se actualice
-        setTimeout(() => {
-            if (kmActualInputRef.current) {
-                kmActualInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                kmActualInputRef.current.focus();
-            }
-        }, 100);
-    };
-
-    const desactivarServicioKm = () => {
-        setKmEnabled(false);
-        setKmActual('');
-        setKmNuevo('');
-        setServicios((prev) => {
-            if (kmServiceIndex === null) return prev;
-            const next = prev.filter((_, i) => i !== kmServiceIndex);
-            return next.length ? next : [{ descripcion: '', precio: '' }];
-        });
-        setKmServiceIndex(null);
-    };
-
-    useEffect(() => {
-        if (!kmEnabled) return;
-        if (kmServiceIndex === null) return;
-
-        setServicios((prev) => {
-            if (kmServiceIndex < 0 || kmServiceIndex >= prev.length) return prev;
-            const desired = buildKmServiceDescripcion(kmActual, kmNuevo);
-            const current = prev[kmServiceIndex]?.descripcion || '';
-            if (current === desired) return prev;
-            return prev.map((s, i) => (i === kmServiceIndex ? { ...s, descripcion: desired } : s));
-        });
-    }, [kmEnabled, kmServiceIndex, kmActual, kmNuevo]);
-
-    const agregarServicioFrecuente = (descripcion: string) => {
-        const desc = descripcion.trim();
-        if (!desc) return;
-
-        setServicios((prev) => {
-            const emptyIndex = prev.findIndex((s) => {
-                const d = s.descripcion.trim();
-                const p = parsePrecio(s.precio);
-                return !d && p === 0;
-            });
-
-            if (emptyIndex >= 0) {
-                const next = prev.map((s, i) => (i === emptyIndex ? { ...s, descripcion: desc } : s));
-                setFocusTarget({ index: emptyIndex, field: 'precio' });
-                return next;
-            }
-
-            const next = [...prev, { descripcion: desc, precio: '' }];
-            setFocusTarget({ index: next.length - 1, field: 'precio' });
-            return next;
-        });
-    };
-
     const eliminarFila = (index: number) => {
         setServicios((prev) => {
             const next = prev.filter((_, i) => i !== index);
             return next.length ? next : [{ descripcion: '', precio: '' }];
         });
-
-        if (kmServiceIndex !== null) {
-            if (index === kmServiceIndex) {
-                setKmEnabled(false);
-                setKmActual('');
-                setKmNuevo('');
-                setKmServiceIndex(null);
-            } else if (index < kmServiceIndex) {
-                setKmServiceIndex(kmServiceIndex - 1);
-            }
-        }
     };
 
     const updateServicio = (index: number, patch: Partial<Servicio>) => {
         setServicios((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+    };
+
+    const agregarServicioFrecuente = (descripcion: string) => {
+        agregarFila({ descripcion });
+    };
+
+    const activarServicioKm = () => {
+        setKmEnabled(true);
+    };
+
+    const desactivarServicioKm = () => {
+        setKmEnabled(false);
+        setKmServiceIndex(null);
+        if (kmServiceIndex !== null) {
+            eliminarFila(kmServiceIndex);
+        }
     };
 
     const crearSoloOrden = async () => {
@@ -537,16 +481,6 @@ function RecepcionContent() {
             alert('Completa los datos del vehículo (Marca, Modelo, Año).');
             return;
         }
-        if (kmEnabled) {
-            if (!kmActual || parsePrecio(kmActual) <= 0 || !kmNuevo || parsePrecio(kmNuevo) <= 0) {
-                alert('Ingresa KM actual y KM nuevo.');
-                return;
-            }
-            if (kmServiceIndex === null) {
-                alert('Activa el servicio KM para poder cobrarlo.');
-                return;
-            }
-        }
 
         const serviciosForOrder = servicios
             .map((s) => ({ descripcion: s.descripcion.trim(), precio: parsePrecio(s.precio) }))
@@ -561,7 +495,6 @@ function RecepcionContent() {
         const shortDescription = serviciosForOrder
             .map((s) => {
                 const d = (s.descripcion || '').toUpperCase();
-                if (d.includes('KM') || d.includes('KILOMETRAJE')) return 'KM';
                 if (d.includes('DPF')) return 'DPF';
                 if (d.includes('SCANNER')) return 'Scanner';
                 if (d.includes('ADBLUE')) return 'AdBlue';
@@ -618,6 +551,12 @@ function RecepcionContent() {
             // Construir número completo de WhatsApp con prefijo +569
             const whatsappCompleto = clienteWhatsapp ? `+569${clienteWhatsapp}` : undefined;
 
+            // Convert KM values properly
+            const kmIngresoValue = kmActual ? parseInt(kmActual.replace(/\D/g, '')) : undefined;
+            const kmSalidaValue = kmNuevo ? parseInt(kmNuevo.replace(/\D/g, '')) : undefined;
+
+            console.log('💾 Guardando KM - Ingreso:', kmIngresoValue, 'Salida:', kmSalidaValue);
+
             const orden = await crearOrden({
                 patente_vehiculo: p,
                 descripcion_ingreso: descripcionIngreso,
@@ -629,6 +568,8 @@ function RecepcionContent() {
                 precio_total: total || undefined,
                 fotos: fotos.length ? fotos : undefined,
                 detalles_vehiculo: detallesVehiculo.trim() || undefined,
+                kilometraje: kmIngresoValue,
+                kilometraje_salida: kmSalidaValue,
             });
 
             const currentCitaId = searchParams.get('citaId');
@@ -678,9 +619,9 @@ function RecepcionContent() {
         setModelo('');
         setAnio('');
         setMotor('');
-        setKmEnabled(false);
         setKmActual('');
         setKmNuevo('');
+        setKmEnabled(false);
         setKmServiceIndex(null);
         setVehiculoLocked(true);
         setEstadoBusqueda('');
@@ -832,10 +773,9 @@ function RecepcionContent() {
                     <button
                         type="button"
                         onClick={() => (kmEnabled ? desactivarServicioKm() : activarServicioKm())}
-                        className={
-                            kmEnabled
-                                ? 'rounded-full border border-blue-500 bg-blue-600/30 px-3 py-2 text-sm font-semibold text-blue-100'
-                                : 'rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700'
+                        className={kmEnabled
+                            ? 'rounded-full border border-blue-500 bg-blue-600/30 px-3 py-2 text-sm font-semibold text-blue-100'
+                            : 'rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700'
                         }
                     >
                         🔘 KM
@@ -852,16 +792,15 @@ function RecepcionContent() {
                     ))}
                 </div>
 
-                {kmEnabled ? (
-                    <div className="mb-4 grid gap-4 rounded-xl border border-slate-700 bg-slate-800/30 p-4 md:grid-cols-2">
+                {kmEnabled && (
+                    <div className="mb-4 grid gap-4 rounded-xl border border-slate-700 bg-slate-800/30 p-4 md:grid-cols-2 animate-in slide-in-from-top-2">
                         <div>
                             <label className="text-sm font-semibold text-slate-200">KM actual</label>
                             <input
-                                ref={kmActualInputRef}
                                 value={formatMilesConPunto(kmActual)}
-                                onChange={(e) => setKmActual(e.target.value.replace(/[^0-9]/g, '').slice(0, 7))}
-                                inputMode="numeric"
+                                onChange={(e) => setKmActual(e.target.value.replace(/[^0-9]/g, ''))}
                                 placeholder="Ej: 200.000"
+                                inputMode="numeric"
                                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-2xl font-bold font-mono tracking-wide text-white"
                             />
                         </div>
@@ -869,17 +808,15 @@ function RecepcionContent() {
                             <label className="text-sm font-semibold text-slate-200">KM nuevo</label>
                             <input
                                 value={formatMilesConPunto(kmNuevo)}
-                                onChange={(e) => setKmNuevo(e.target.value.replace(/[^0-9]/g, '').slice(0, 7))}
-                                inputMode="numeric"
+                                onChange={(e) => setKmNuevo(e.target.value.replace(/[^0-9]/g, ''))}
                                 placeholder="Ej: 120.000"
+                                inputMode="numeric"
                                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-2xl font-bold font-mono tracking-wide text-white"
                             />
                         </div>
-                        <div className="md:col-span-2 text-xs text-slate-400">
-                            Se agrega como servicio cobrable. Define el precio en la fila de KM.
-                        </div>
                     </div>
-                ) : null}
+                )}
+
 
                 <div className="overflow-hidden rounded-xl border border-slate-700">
                     <table className="w-full">
@@ -1062,21 +999,24 @@ function RecepcionContent() {
                 </button>
             </div>
 
+
             {/* Debt Alert Modal */}
-            {debtData && (
-                <DebtAlertModal
-                    isOpen={isDebtModalOpen}
-                    onClose={() => setIsDebtModalOpen(false)}
-                    onProceed={() => {
-                        console.log('[Debt Modal] User chose to proceed anyway');
-                    }}
-                    patente={patente}
-                    totalDebt={debtData.totalDebt}
-                    debtOrders={debtData.debtOrders}
-                    lastVisit={debtData.lastVisit}
-                />
-            )}
-        </div>
+            {
+                debtData && (
+                    <DebtAlertModal
+                        isOpen={isDebtModalOpen}
+                        onClose={() => setIsDebtModalOpen(false)}
+                        onProceed={() => {
+                            console.log('[Debt Modal] User chose to proceed anyway');
+                        }}
+                        patente={patente}
+                        totalDebt={debtData?.totalDebt ?? 0}
+                        debtOrders={debtData?.debtOrders ?? []}
+                        lastVisit={debtData?.lastVisit}
+                    />
+                )
+            }
+        </div >
     );
 }
 

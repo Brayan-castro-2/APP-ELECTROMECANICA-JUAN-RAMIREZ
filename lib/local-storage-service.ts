@@ -34,6 +34,8 @@ export interface OrdenDB {
     cc?: string;
     metodo_pago?: string;
     metodos_pago?: Array<{ metodo: string; monto: number }> | null;
+    kilometraje?: number | null;
+    kilometraje_salida?: number | null;
 }
 
 export interface PerfilDB {
@@ -234,24 +236,34 @@ export async function crearOrden(orden: {
     metodo_pago?: string;
     asignado_a?: string;
     detalles_vehiculo?: string;
+    kilometraje?: number;
+    kilometraje_salida?: number;
 }): Promise<OrdenDB | null> {
     const ordenes = getFromStorage<OrdenDB[]>(KEYS.ORDENES, []);
 
+    const newId = getNextOrderId();
+    const normalizedPatente = orden.patente_vehiculo.toUpperCase();
+
     const nuevaOrden: OrdenDB = {
-        id: getNextOrderId(),
-        patente_vehiculo: orden.patente_vehiculo.toUpperCase(),
+        id: newId,
+        patente_vehiculo: normalizedPatente,
         descripcion_ingreso: orden.descripcion_ingreso,
         creado_por: orden.creado_por,
+        asignado_a: orden.asignado_a || orden.creado_por,
         estado: orden.estado || 'pendiente',
-        asignado_a: orden.asignado_a || orden.creado_por, // Asignar al especificado o al creador
         fecha_ingreso: new Date().toISOString(),
-        fecha_actualizacion: new Date().toISOString(),
         fotos: orden.fotos || [],
-        cliente_nombre: orden.cliente_nombre,
-        cliente_telefono: orden.cliente_telefono,
-        precio_total: orden.precio_total,
-        metodo_pago: orden.metodo_pago,
-        detalles_vehiculo: orden.detalles_vehiculo,
+        cliente_nombre: orden.cliente_nombre || null,
+        cliente_telefono: orden.cliente_telefono || null,
+        precio_total: orden.precio_total || null,
+        metodo_pago: orden.metodo_pago || null,
+        metodos_pago: null,
+        fecha_entrega: null,
+        detalle_trabajos: null,
+        detalles_vehiculo: orden.detalles_vehiculo || null,
+        fecha_actualizacion: null,
+        kilometraje: orden.kilometraje || null,
+        kilometraje_salida: orden.kilometraje_salida || null,
     };
 
     ordenes.push(nuevaOrden);

@@ -71,11 +71,9 @@ export default function OrdenDetailPage() {
                 setPrecioTotal(ordenData.precio_total?.toString() || '0');
                 setDetalleTrabajos(ordenData.detalle_trabajos || '');
 
-                const servicios = ordenData.descripcion_ingreso || '';
-                const kmMatch = servicios.match(/KM:\s*(\d+\.?\d*)/);
-                const kmSalidaMatch = servicios.match(/→\s*(\d+\.?\d*)/);
-                if (kmMatch) setKmIngreso(kmMatch[1]);
-                if (kmSalidaMatch) setKmSalida(kmSalidaMatch[1]);
+                // Load KM values from database fields
+                setKmIngreso(ordenData.kilometraje?.toString() || '');
+                setKmSalida(ordenData.kilometraje_salida?.toString() || '');
 
                 // Cargar datos del vehículo
                 const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
@@ -98,16 +96,10 @@ export default function OrdenDetailPage() {
             return;
         }
 
-        let descripcionActualizada = descripcion;
-        if (kmIngreso && kmSalida) {
-            const precioKm = precio > 0 ? precio : 15000;
-            descripcionActualizada = `${descripcion}\n\nServicios:\n- KM: ${kmIngreso} KM → ${kmSalida} KM: $${precioKm.toLocaleString('es-CL')}`;
-        }
-
         setIsSaving(true);
 
         const updateData: any = {
-            descripcion_ingreso: descripcionActualizada,
+            descripcion_ingreso: descripcion,
             estado,
             precio_total: precio,
         };
@@ -118,6 +110,15 @@ export default function OrdenDetailPage() {
 
         if (detalleTrabajos) {
             updateData.detalle_trabajos = detalleTrabajos;
+        }
+
+        // Save KM values to proper database fields
+        if (kmIngreso) {
+            updateData.kilometraje = parseInt(kmIngreso);
+        }
+
+        if (kmSalida) {
+            updateData.kilometraje_salida = parseInt(kmSalida);
         }
 
         const updated = await actualizarOrden(order.id, updateData);

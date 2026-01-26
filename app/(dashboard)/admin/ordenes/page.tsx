@@ -229,20 +229,40 @@ export default function OrdenesPage() {
         }).sort((a, b) => new Date(b.fecha_ingreso).getTime() - new Date(a.fecha_ingreso).getTime());
     }, [orders, appointments, viewFilter, searchTerm, statusFilter, mechanicFilter, debtFilter, dateFilter, vehiculosMap, hasDebt, appointmentToOrderFormat, isAppointmentNearby]);
 
-    const handleDeleteOrder = async (item: { id: number, isAppointment?: boolean }) => {
+    const handleDeleteOrder = async (item: OrdenDB | CitaDB) => {
+        const isOrder = 'patente_vehiculo' in item;
         try {
-            if (item.isAppointment) {
-                await eliminarCita(item.id);
-                // Invalidar ambas queries por si acaso
-                queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
-                queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
+            // Optimistic update - remove immediately from UI
+            if (isOrder) {
+                // Update orders list immediately
+                queryClient.setQueryData(ORDERS_QUERY_KEY, (oldData: OrdenDB[] | undefined) => {
+                    if (!oldData) return oldData;
+                    return oldData.filter(order => order.id !== item.id);
+                });
             } else {
+                // Update appointments list immediately
+                queryClient.setQueryData(APPOINTMENTS_QUERY_KEY, (oldData: CitaDB[] | undefined) => {
+                    if (!oldData) return oldData;
+                    return oldData.filter(apt => apt.id !== item.id);
+                });
+            }
+
+            // Perform actual deletion in background
+            if (isOrder) {
                 await deleteOrder.mutateAsync(item.id);
+            } else {
+                await eliminarCita(item.id);
             }
             setDeleteConfirm(null);
         } catch (error) {
             console.error('Error al eliminar:', error);
             alert('Error al eliminar el elemento');
+            // Rollback: re-fetch data on error
+            if (isOrder) {
+                queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
+            } else {
+                queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
+            }
         }
     };
 
@@ -418,7 +438,6 @@ export default function OrdenesPage() {
                         <div className="space-y-1.5">
                             <div className="flex items-center">
                                 <label className="text-xs text-slate-400 font-medium px-1">Tipo de Vista</label>
-                                <NewBadge />
                             </div>
                             <Select value={viewFilter} onValueChange={setViewFilter}>
                                 <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-sm h-10">
@@ -466,7 +485,6 @@ export default function OrdenesPage() {
                             <div className="space-y-1.5">
                                 <div className="flex items-center">
                                     <label className="text-xs text-slate-400 font-medium px-1">Deuda</label>
-                                    <NewBadge />
                                 </div>
                                 <Select value={debtFilter} onValueChange={setDebtFilter}>
                                     <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-xs sm:text-sm h-9">
@@ -791,6 +809,27 @@ export default function OrdenesPage() {
                                                                     </div>
                                                                 )}
                                                             </div>
+
+                                                            {/* Kilometraje Section */}
+                                                            {(order.kilometraje || order.kilometraje_salida) && (
+                                                                <div className="space-y-2">
+                                                                    <h3 className="text-sm font-semibold text-slate-300">Kilometraje</h3>
+                                                                    <div className="bg-slate-900/50 rounded-lg p-4 space-y-2 text-sm">
+                                                                        {order.kilometraje && (
+                                                                            <div className="flex justify-between">
+                                                                                <span className="text-slate-400">KM Ingreso:</span>
+                                                                                <span className="text-white font-mono font-semibold">{order.kilometraje.toLocaleString('es-CL')} km</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {order.kilometraje_salida && (
+                                                                            <div className="flex justify-between">
+                                                                                <span className="text-slate-400">KM Salida:</span>
+                                                                                <span className="text-white font-mono font-semibold">{order.kilometraje_salida.toLocaleString('es-CL')} km</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
 
                                                             {/* Descripción Completa */}
                                                             <div className="space-y-2">

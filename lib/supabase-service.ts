@@ -104,50 +104,67 @@ export async function subirImagen(file: File, carpeta: string = 'ordenes'): Prom
 // ============ ÓRDENES ============
 
 // Obtener todas las órdenes con JOINs (OPTIMIZADO)
+// Obtener todas las órdenes (Manual Fetch para evitar errores de FK)
 export async function obtenerOrdenes(): Promise<OrdenConDetallesDB[]> {
-    console.log('⚡ Fetcheando órdenes con JOINs optimizados...');
+    console.log('⚡ Fetcheando órdenes (Manual Join)...');
 
-    // Consulta con JOINs explícitos usando la sintaxis de Supabase
-    // NOTA: Para que esto funcione, las FK deben estar bien definidas en Supabase
-    const { data, error } = await supabase
+    // 1. Obtener órdenes
+    const { data: ordenes, error: ordenesError } = await supabase
         .from('ordenes')
-        .select(`
-            *,
-            vehiculos (
-                patente,
-                marca,
-                modelo,
-                anio,
-                motor,
-                color
-            ),
-            perfiles_creado:perfiles!creado_por (
-                nombre_completo,
-                email
-            ),
-            perfiles_asignado:perfiles!asignado_a (
-                nombre_completo,
-                email
-            )
-        `)
+        .select('*')
         .order('fecha_ingreso', { ascending: false });
 
-    if (error) {
-        console.error('Error al obtener órdenes:', error);
+    if (ordenesError) {
+        console.error('Error al obtener órdenes:', ordenesError);
         return [];
     }
 
-    // Mapeo seguro para TypeScript
-    const ordenesMapeadas = (data || []).map((item: any) => ({
-        ...item,
-        // Asegurar que vehiculos sea un objeto y no un array (por si acaso devuelve array)
-        vehiculos: Array.isArray(item.vehiculos) ? item.vehiculos[0] : item.vehiculos,
-        // Aplanar perfiles para facilitar uso
-        perfiles_creado: Array.isArray(item.perfiles_creado) ? item.perfiles_creado[0] : item.perfiles_creado,
-        perfiles_asignado: Array.isArray(item.perfiles_asignado) ? item.perfiles_asignado[0] : item.perfiles_asignado
-    })) as OrdenConDetallesDB[];
+    if (!ordenes || ordenes.length === 0) return [];
 
-    return ordenesMapeadas;
+    // 2. Obtener vehículos únicos y perfiles únicos
+    const patentes = [...new Set(ordenes.map(o => o.patente_vehiculo))];
+    const userIds = [...new Set([
+        ...ordenes.map(o => o.creado_por),
+        ...ordenes.map(o => o.asignado_a).filter(id => id) as string[]
+    ])];
+
+    // 3. Fetch paralelo de datos relacionados
+    const [vehiculosRes, perfilesRes] = await Promise.all([
+        supabase.from('vehiculos').select('*').in('patente', patentes),
+        supabase.from('perfiles').select('*').in('id', userIds)
+    ]);
+
+    const vehiculosMap = new Map((vehiculosRes.data || []).map(v => [v.patente, v]));
+    const perfilesMap = new Map((perfilesRes.data || []).map(p => [p.id, p]));
+
+    // 4. Mapear resultados
+    const ordenesCompletas = ordenes.map(orden => {
+        const vehiculo = vehiculosMap.get(orden.patente_vehiculo);
+        const creadoPor = perfilesMap.get(orden.creado_por);
+        const asignadoA = orden.asignado_a ? perfilesMap.get(orden.asignado_a) : null;
+
+        return {
+            ...orden,
+            vehiculos: vehiculo ? {
+                patente: vehiculo.patente,
+                marca: vehiculo.marca,
+                modelo: vehiculo.modelo,
+                anio: vehiculo.anio,
+                motor: vehiculo.motor,
+                color: vehiculo.color
+            } : null,
+            perfiles_creado: creadoPor ? {
+                nombre_completo: creadoPor.nombre_completo,
+                email: creadoPor.email
+            } : null,
+            perfiles_asignado: asignadoA ? {
+                nombre_completo: asignadoA.nombre_completo,
+                email: asignadoA.email
+            } : null
+        };
+    }) as unknown as OrdenConDetallesDB[];
+
+    return ordenesCompletas;
 }
 
 // Obtener órdenes del día
@@ -198,6 +215,8 @@ export async function crearOrden(orden: {
     metodo_pago?: string;
     asignado_a?: string;
     detalles_vehiculo?: string;
+    kilometraje?: number;
+    kilometraje_salida?: number;
 }): Promise<OrdenDB | null> {
     // IMPORTANTE: Primero verificar si el vehículo existe, si no, crearlo
     const patenteNormalizada = orden.patente_vehiculo.toUpperCase();
@@ -244,6 +263,8 @@ export async function crearOrden(orden: {
             precio_total: orden.precio_total || 0,
             metodo_pago: orden.metodo_pago,
             detalles_vehiculo: orden.detalles_vehiculo,
+            kilometraje: orden.kilometraje,
+            kilometraje_salida: orden.kilometraje_salida,
         }])
         .select()
         .single();

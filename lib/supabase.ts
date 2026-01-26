@@ -35,6 +35,8 @@ export interface OrdenDB {
     fecha_completada?: string | null;
     fecha_entrega?: string | null;
     metodos_pago?: Array<{ metodo: string; monto: number }> | null;
+    kilometraje?: number;
+    kilometraje_salida?: number;
 }
 
 export interface OrdenConDetallesDB extends OrdenDB {

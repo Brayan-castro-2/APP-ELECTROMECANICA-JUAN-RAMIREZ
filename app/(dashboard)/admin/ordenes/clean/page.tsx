@@ -93,11 +93,9 @@ export default function OrdenesCleanPage() {
                 setClienteTelefono(ordenData.cliente_telefono || '');
                 setMetodosPago(ordenData.metodos_pago || []);
 
-                const servicios = ordenData.descripcion_ingreso || '';
-                const kmMatch = servicios.match(/KM:\s*(\d+\.?\d*)/);
-                const kmSalidaMatch = servicios.match(/→\s*(\d+\.?\d*)/);
-                if (kmMatch) setKmIngreso(kmMatch[1]);
-                if (kmSalidaMatch) setKmSalida(kmSalidaMatch[1]);
+                setMetodosPago(ordenData.metodos_pago || []);
+                setKmIngreso(ordenData.kilometraje ? String(ordenData.kilometraje) : '');
+                setKmSalida(ordenData.kilometraje_salida ? String(ordenData.kilometraje_salida) : '');
 
                 const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
                 setVehiculo(veh);
@@ -244,11 +242,8 @@ export default function OrdenesCleanPage() {
             }
         }
 
-        let descripcionActualizada = descripcion;
-        if (kmIngreso && kmSalida) {
-            const precioKm = precio > 0 ? precio : 15000;
-            descripcionActualizada = `${descripcion}\n\nServicios:\n- KM: ${kmIngreso} KM → ${kmSalida} KM: $${precioKm.toLocaleString('es-CL')}`;
-        }
+        // NOTA: Ya no inyectamos "KM: X -> Y" en la descripción porque ahora son columnas reales.
+        const descripcionActualizada = descripcion;
 
         setIsSaving(true);
 
@@ -262,6 +257,8 @@ export default function OrdenesCleanPage() {
             metodos_pago: metodosPago.length > 0 ? metodosPago : null,
             asignado_a: asignadoA || null,
             detalle_trabajos: detalleTrabajos || null,
+            kilometraje: kmIngreso ? Number(kmIngreso) : null,
+            kilometraje_salida: kmSalida ? Number(kmSalida) : null,
         };
 
         // LÓGICA DE FECHAS

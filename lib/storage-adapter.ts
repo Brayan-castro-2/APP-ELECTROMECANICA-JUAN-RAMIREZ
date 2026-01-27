@@ -89,6 +89,8 @@ export async function crearOrden(orden: {
     metodo_pago?: string;
     asignado_a?: string;
     detalles_vehiculo?: string;
+    kilometraje?: number;
+    kilometraje_salida?: number;
 }): Promise<OrdenDB | null> {
     if (isSupabase()) {
         console.log('🔵 Usando Supabase para crear orden');

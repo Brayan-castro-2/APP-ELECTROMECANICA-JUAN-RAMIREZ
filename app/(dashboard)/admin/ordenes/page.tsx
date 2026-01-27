@@ -272,35 +272,24 @@ export default function OrdenesPage() {
     const handleDeleteOrder = async (item: OrdenDB | CitaDB) => {
         const isOrder = 'patente_vehiculo' in item;
         try {
-            // Optimistic update - remove immediately from UI
+            // Perform actual deletion (hook handles optimistic updates for orders)
             if (isOrder) {
-                // Update orders list immediately
-                queryClient.setQueryData(ORDERS_QUERY_KEY, (oldData: OrdenDB[] | undefined) => {
-                    if (!oldData) return oldData;
-                    return oldData.filter(order => order.id !== item.id);
-                });
+                await deleteOrder.mutateAsync(item.id);
             } else {
-                // Update appointments list immediately
+                // Manual update for appointments (kept simple)
                 queryClient.setQueryData(APPOINTMENTS_QUERY_KEY, (oldData: CitaDB[] | undefined) => {
                     if (!oldData) return oldData;
                     return oldData.filter(apt => apt.id !== item.id);
                 });
-            }
-
-            // Perform actual deletion in background
-            if (isOrder) {
-                await deleteOrder.mutateAsync(item.id);
-            } else {
                 await eliminarCita(item.id);
+                queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
             }
             setDeleteConfirm(null);
         } catch (error) {
             console.error('Error al eliminar:', error);
             alert('Error al eliminar el elemento');
-            // Rollback: re-fetch data on error
-            if (isOrder) {
-                queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
-            } else {
+
+            if (!isOrder) {
                 queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
             }
         }

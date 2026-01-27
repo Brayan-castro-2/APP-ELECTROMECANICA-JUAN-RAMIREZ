@@ -76,8 +76,34 @@ export function useDeleteOrder() {
 
     return useMutation({
         mutationFn: (orderId: number) => eliminarOrden(orderId),
+        onMutate: async (orderId) => {
+            await queryClient.cancelQueries({ queryKey: INFINITE_ORDERS_QUERY_KEY });
+            await queryClient.cancelQueries({ queryKey: ORDERS_QUERY_KEY });
+
+            const previousInfiniteOrders = queryClient.getQueryData(INFINITE_ORDERS_QUERY_KEY);
+
+            queryClient.setQueryData(INFINITE_ORDERS_QUERY_KEY, (oldData: any) => {
+                if (!oldData) return oldData;
+                return {
+                    ...oldData,
+                    pages: oldData.pages.map((page: any) => ({
+                        ...page,
+                        orders: page.orders.filter((order: OrdenDB) => order.id !== orderId),
+                    })),
+                };
+            });
+
+            return { previousInfiniteOrders };
+        },
+        onError: (err, newTodo, context: any) => {
+            if (context?.previousInfiniteOrders) {
+                queryClient.setQueryData(INFINITE_ORDERS_QUERY_KEY, context.previousInfiniteOrders);
+            }
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: INFINITE_ORDERS_QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: ['orders', 'dashboard'] });
         },
     });
 }

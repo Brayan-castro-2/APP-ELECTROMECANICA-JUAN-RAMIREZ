@@ -11,6 +11,8 @@ import { DebtAlertModal } from '@/components/reception/debt-alert-modal';
 import type { OrdenDB, CitaDB } from '@/lib/storage-adapter';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { INFINITE_ORDERS_QUERY_KEY, ORDERS_QUERY_KEY } from '@/hooks/use-orders';
+import { DASHBOARD_ORDERS_QUERY_KEY } from '@/hooks/use-dashboard';
 
 const MOCK_DB: Record<string, { marca: string; modelo: string; anio: string; motor: string }> = {
     PROFE1: { marca: 'Nissan', modelo: 'V16', anio: '2010', motor: '1.6 Twin Cam' },
@@ -594,7 +596,9 @@ function RecepcionContent() {
             setSuccessMsg(`Orden #${orden.id} creada`);
 
             // Invalidar caché para que la nueva orden aparezca inmediatamente
-            await queryClient.invalidateQueries({ queryKey: ['orders'] });
+            await queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
+            await queryClient.invalidateQueries({ queryKey: INFINITE_ORDERS_QUERY_KEY });
+            await queryClient.invalidateQueries({ queryKey: DASHBOARD_ORDERS_QUERY_KEY });
             await queryClient.invalidateQueries({ queryKey: ['appointments'] });
 
             if (user.role === 'admin') {

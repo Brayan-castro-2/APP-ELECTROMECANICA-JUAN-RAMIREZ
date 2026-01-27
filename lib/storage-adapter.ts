@@ -59,6 +59,13 @@ export async function obtenerOrdenesCount(): Promise<number> {
     return localService.obtenerOrdenesCount();
 }
 
+export async function obtenerOrdenesLight(): Promise<OrdenConDetallesDB[]> {
+    if (isSupabase()) {
+        return supabaseService.obtenerOrdenesLight();
+    }
+    return localService.obtenerOrdenesLight();
+}
+
 export async function obtenerOrdenesHoy(): Promise<OrdenDB[]> {
     if (isSupabase()) {
         console.log('🔵 Usando Supabase para obtener órdenes de hoy');

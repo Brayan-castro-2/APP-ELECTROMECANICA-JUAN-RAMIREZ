@@ -630,3 +630,77 @@ export async function eliminarCita(id: number): Promise<boolean> {
 
     return true;
 }
+
+// Obtener órdenes "ligeras" para el dashboard (sin campos pesados, pero con relaciones)
+export async function obtenerOrdenesLight(): Promise<OrdenConDetallesDB[]> {
+    console.log('⚡ Fetcheando órdenes Light (Dashboard)...');
+
+    // 1. Fetch de órdenes (solo columnas necesarias)
+    const { data: ordenes, error } = await supabase
+        .from('ordenes')
+        .select(`
+            id,
+            fecha_ingreso,
+            estado,
+            precio_total,
+            cliente_nombre,
+            patente_vehiculo,
+            creado_por,
+            asignado_a,
+            descripcion_ingreso,
+            metodos_pago,
+            fecha_completada
+        `)
+        .order('fecha_ingreso', { ascending: false });
+
+    if (error) {
+        console.error('Error al obtener órdenes light:', error);
+        return [];
+    }
+
+    if (!ordenes || ordenes.length === 0) return [];
+
+    // 2. Obtener IDs únicos para relaciones
+    const patentes = [...new Set(ordenes.map(o => o.patente_vehiculo))];
+    const userIds = [...new Set([
+        ...ordenes.map(o => o.creado_por),
+        ...ordenes.map(o => o.asignado_a).filter(id => id) as string[]
+    ])];
+
+    // 3. Fetch paralelo de datos relacionados (solo columnas necesarias de vehículos)
+    const [vehiculosRes, perfilesRes] = await Promise.all([
+        supabase.from('vehiculos').select('patente, marca, modelo, anio').in('patente', patentes),
+        supabase.from('perfiles').select('id, nombre_completo, email').in('id', userIds)
+    ]);
+
+    const vehiculosMap = new Map((vehiculosRes.data || []).map(v => [v.patente, v]));
+    const perfilesMap = new Map((perfilesRes.data || []).map(p => [p.id, p]));
+
+    // 4. Mapear resultados (Hydration)
+    const ordenesCompletas = ordenes.map(orden => {
+        const vehiculo = vehiculosMap.get(orden.patente_vehiculo);
+        const creadoPor = perfilesMap.get(orden.creado_por);
+        const asignadoA = orden.asignado_a ? perfilesMap.get(orden.asignado_a) : null;
+
+        return {
+            ...orden,
+            vehiculos: vehiculo ? {
+                patente: vehiculo.patente,
+                marca: vehiculo.marca,
+                modelo: vehiculo.modelo,
+                anio: vehiculo.anio,
+                // Motor y color omitidos para ahorrar
+            } : null,
+            perfiles_creado: creadoPor ? {
+                nombre_completo: creadoPor.nombre_completo,
+                email: creadoPor.email
+            } : null,
+            perfiles_asignado: asignadoA ? {
+                nombre_completo: asignadoA.nombre_completo,
+                email: asignadoA.email
+            } : null
+        };
+    }) as unknown as OrdenConDetallesDB[];
+
+    return ordenesCompletas;
+}

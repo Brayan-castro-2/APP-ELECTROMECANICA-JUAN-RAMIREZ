@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { useOrders } from '@/hooks/use-orders';
+import { useDashboardOrders } from '@/hooks/use-dashboard';
 import {
     type OrdenDB,
 } from '@/lib/storage-adapter';
@@ -54,7 +54,7 @@ function StatsSkeleton() {
 
 export default function AdminPage() {
     const { user } = useAuth();
-    const { data: allOrders = [], isLoading: isLoadingOrders } = useOrders();
+    const { data: allOrders = [], isLoading: isLoadingOrders } = useDashboardOrders();
     // Ya no necesitamos cargar perfiles y vehículos por separado para el dashboard
     // const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     // const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);

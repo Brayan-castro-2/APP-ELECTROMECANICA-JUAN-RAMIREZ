@@ -1,7 +1,10 @@
 // Servicio de almacenamiento local para reemplazar Supabase
 // Todas las operaciones usan localStorage del navegador
 
+
 // ============ TIPOS ============
+
+import { OrdenConDetallesDB } from './supabase';
 
 export interface VehiculoDB {
     patente: string;
@@ -561,4 +564,11 @@ export async function eliminarCita(id: number): Promise<boolean> {
 
     localStorage.setItem(KEYS.CITAS, JSON.stringify(filtered));
     return true;
+}
+
+
+export async function obtenerOrdenesLight(): Promise<OrdenConDetallesDB[]> {
+    // En local storage no hay costo de banda ancha, devolvemos todo pero capeado a las propiedades light si quisiéramos ser estrictos
+    // Por simplicidad devolvemos las órdenes completas, el cliente usará solo lo que necesite
+    return obtenerOrdenes() as unknown as OrdenConDetallesDB[];
 }

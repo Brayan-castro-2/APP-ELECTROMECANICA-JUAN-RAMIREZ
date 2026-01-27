@@ -105,14 +105,22 @@ export async function subirImagen(file: File, carpeta: string = 'ordenes'): Prom
 
 // Obtener todas las órdenes con JOINs (OPTIMIZADO)
 // Obtener todas las órdenes (Manual Fetch para evitar errores de FK)
-export async function obtenerOrdenes(): Promise<OrdenConDetallesDB[]> {
-    console.log('⚡ Fetcheando órdenes (Manual Join)...');
+export async function obtenerOrdenes(options?: { limit?: number; offset?: number }): Promise<OrdenConDetallesDB[]> {
+    const limit = options?.limit;
+    const offset = options?.offset ?? 0;
+    console.log(`⚡ Fetcheando órdenes (Manual Join${limit ? `, limit: ${limit}, offset: ${offset}` : ''})...`);
 
-    // 1. Obtener órdenes
-    const { data: ordenes, error: ordenesError } = await supabase
+    // 1. Obtener órdenes con paginación opcional
+    let query = supabase
         .from('ordenes')
         .select('*')
         .order('fecha_ingreso', { ascending: false });
+
+    if (limit) {
+        query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: ordenes, error: ordenesError } = await query;
 
     if (ordenesError) {
         console.error('Error al obtener órdenes:', ordenesError);
@@ -200,6 +208,20 @@ export async function obtenerOrdenPorId(id: number): Promise<OrdenDB | null> {
     }
 
     return data;
+}
+
+// Get total count of orders
+export async function obtenerOrdenesCount(): Promise<number> {
+    const { count, error } = await supabase
+        .from('ordenes')
+        .select('*', { count: 'exact', head: true });
+
+    if (error) {
+        console.error('Error al obtener count de órdenes:', error);
+        return 0;
+    }
+
+    return count ?? 0;
 }
 
 // Crear nueva orden

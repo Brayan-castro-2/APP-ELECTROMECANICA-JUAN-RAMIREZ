@@ -42,14 +42,21 @@ export async function obtenerVehiculos(): Promise<VehiculoDB[]> {
 
 // ============ ÓRDENES ============
 
-export async function obtenerOrdenes(): Promise<OrdenConDetallesDB[]> {
+export async function obtenerOrdenes(options?: { limit?: number; offset?: number }): Promise<OrdenConDetallesDB[]> {
     if (isSupabase()) {
         console.log('🔵 Usando Supabase para obtener órdenes');
-        return supabaseService.obtenerOrdenes();
+        return supabaseService.obtenerOrdenes(options);
     }
     console.log('🟡 Usando localStorage para obtener órdenes');
     // Cast simple OrdenDB[] to OrdenConDetallesDB[] (missing fields will be undefined)
-    return localService.obtenerOrdenes() as unknown as OrdenConDetallesDB[];
+    return localService.obtenerOrdenes(options) as unknown as OrdenConDetallesDB[];
+}
+
+export async function obtenerOrdenesCount(): Promise<number> {
+    if (isSupabase()) {
+        return supabaseService.obtenerOrdenesCount();
+    }
+    return localService.obtenerOrdenesCount();
 }
 
 export async function obtenerOrdenesHoy(): Promise<OrdenDB[]> {

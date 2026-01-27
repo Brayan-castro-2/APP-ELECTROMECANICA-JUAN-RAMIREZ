@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo, useCallback, Fragment } from 'react';
+import { useState, useMemo, useCallback, Fragment, useEffect, useRef } from 'react';
 import { type OrdenDB, type PerfilDB, type VehiculoDB, actualizarOrden, eliminarCita } from '@/lib/storage-adapter';
-import { useOrders, useDeleteOrder } from '@/hooks/use-orders';
+import { useInfiniteOrders, useOrdersCount, useDeleteOrder } from '@/hooks/use-orders';
 import { useQueryClient } from '@tanstack/react-query';
 import { ORDERS_QUERY_KEY } from '@/hooks/use-orders';
 import { usePerfiles } from '@/hooks/use-perfiles';
@@ -36,12 +36,27 @@ import Link from 'next/link';
 
 export default function OrdenesPage() {
     const { user } = useAuth();
-    const { data: orders = [], isLoading: isLoadingOrders } = useOrders();
+    const {
+        data: infiniteData,
+        isLoading: isLoadingOrders,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useInfiniteOrders();
+    const { data: totalCount = 0 } = useOrdersCount();
     const { data: appointments = [], isLoading: isLoadingAppointments } = useAppointments();
     const { data: perfiles = [], isLoading: isLoadingPerfiles } = usePerfiles();
     const { data: vehiculos = [], isLoading: isLoadingVehiculos } = useVehiculos();
     const deleteOrder = useDeleteOrder();
     const queryClient = useQueryClient();
+
+    // Flatten infinite pages into single array
+    const orders = useMemo(() => {
+        return infiniteData?.pages.flatMap(page => page.orders) ?? [];
+    }, [infiniteData]);
+
+    // Ref for intersection observer
+    const loadMoreRef = useRef<HTMLDivElement>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewFilter, setViewFilter] = useState<string>('orders'); // NEW: orders, appointments, nearby, all
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -54,6 +69,31 @@ export default function OrdenesPage() {
     const isAdmin = user?.role === 'admin';
     const canViewPrices = user?.name?.toLowerCase().includes('juan');
     const isLoading = isLoadingOrders || isLoadingPerfiles || isLoadingVehiculos;
+
+    // Infinite scroll: observe when loadMoreRef becomes visible
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                // When the sentinel div is visible and we have more pages
+                if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                    console.log('📜 Loading more orders...');
+                    fetchNextPage();
+                }
+            },
+            { threshold: 0.1 } // Trigger when 10% visible
+        );
+
+        const currentRef = loadMoreRef.current;
+        if (currentRef) {
+            observer.observe(currentRef);
+        }
+
+        return () => {
+            if (currentRef) {
+                observer.unobserve(currentRef);
+            }
+        };
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     // Memoizar mapas para búsquedas O(1) en lugar de O(n)
     const perfilesMap = useMemo(() => {
@@ -530,7 +570,7 @@ export default function OrdenesPage() {
             <Card className="bg-slate-800/50 border-slate-700/50">
                 <CardHeader>
                     <CardTitle className="text-white">
-                        {filteredOrders.length} orden{filteredOrders.length !== 1 ? 'es' : ''} encontrada{filteredOrders.length !== 1 ? 's' : ''}
+                        {totalCount} orden{totalCount !== 1 ? 'es' : ''} encontrada{totalCount !== 1 ? 's' : ''} {filteredOrders.length < totalCount && `(mostrando ${filteredOrders.length})`}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -847,6 +887,21 @@ export default function OrdenesPage() {
                                 })}
                             </TableBody>
                         </Table>
+
+                        {/* Sentinel div for infinite scroll */}
+                        <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+                            {isFetchingNextPage && (
+                                <div className="flex items-center gap-2 text-slate-400">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span className="text-sm">Cargando más órdenes...</span>
+                                </div>
+                            )}
+                            {!hasNextPage && filteredOrders.length > 0 && (
+                                <div className="text-sm text-slate-500">
+                                    No hay más órdenes
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Mobile List */}

@@ -200,11 +200,24 @@ export async function obtenerVehiculos(): Promise<VehiculoDB[]> {
 
 // ============ ÓRDENES ============
 
-export async function obtenerOrdenes(): Promise<OrdenDB[]> {
+export async function obtenerOrdenes(options?: { limit?: number; offset?: number }): Promise<OrdenDB[]> {
     const ordenes = getFromStorage<OrdenDB[]>(KEYS.ORDENES, []);
-    return ordenes.sort((a, b) =>
+    const sorted = ordenes.sort((a, b) =>
         new Date(b.fecha_ingreso).getTime() - new Date(a.fecha_ingreso).getTime()
     );
+
+    // Apply pagination if specified
+    if (options?.limit) {
+        const offset = options.offset ?? 0;
+        return sorted.slice(offset, offset + options.limit);
+    }
+
+    return sorted;
+}
+
+export async function obtenerOrdenesCount(): Promise<number> {
+    const ordenes = getFromStorage<OrdenDB[]>(KEYS.ORDENES, []);
+    return ordenes.length;
 }
 
 export async function obtenerOrdenesHoy(): Promise<OrdenDB[]> {

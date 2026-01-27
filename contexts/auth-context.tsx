@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { 
-    loginConCredenciales, 
-    logout as logoutService, 
+import {
+    loginConCredenciales,
+    logout as logoutService,
     obtenerSesionActual,
     inicializarLocalStorage,
-    type PerfilDB 
+    type PerfilDB
 } from '@/lib/storage-adapter';
 import { ORDERS_QUERY_KEY } from '@/hooks/use-orders';
 import { USERS_QUERY_KEY } from '@/hooks/use-users';
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
                 // Inicializar localStorage con datos por defecto
                 inicializarLocalStorage();
-                
+
                 // Obtener sesión guardada
                 const result = await obtenerSesionActual();
 
@@ -99,11 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('🚀 Precargando datos en background...');
             queryClient.prefetchQuery({
                 queryKey: ORDERS_QUERY_KEY,
-                queryFn: obtenerOrdenes,
+                queryFn: () => obtenerOrdenes(),
             });
             queryClient.prefetchQuery({
                 queryKey: USERS_QUERY_KEY,
-                queryFn: obtenerPerfiles,
+                queryFn: () => obtenerPerfiles(),
             });
             console.log('✅ Prefetch iniciado');
 

@@ -363,7 +363,7 @@ export async function crearUsuario(
     password: string,
     nombreCompleto: string,
     rol: 'admin' | 'mecanico'
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; user?: PerfilDB }> {
     const perfiles = getFromStorage<PerfilDB[]>(KEYS.PERFILES, []);
 
     // Verificar si el email ya existe
@@ -383,7 +383,38 @@ export async function crearUsuario(
     saveToStorage(KEYS.PERFILES, perfiles);
 
     console.log('✅ Usuario creado:', email);
-    return { success: true };
+    return { success: true, user: nuevoPerfil };
+}
+
+// ============ FILTROS DE FECHA ============
+
+// Obtener órdenes por rango de fechas (localStorage)
+export async function obtenerOrdenesPorRangoFechas(
+    startDate: Date,
+    endDate: Date
+): Promise<OrdenDB[]> {
+    const ordenes = getFromStorage<OrdenDB[]>(KEYS.ORDENES, []);
+    return ordenes.filter(orden => {
+        const fechaOrden = new Date(orden.fecha_ingreso);
+        return fechaOrden >= startDate && fechaOrden <= endDate;
+    }).sort((a, b) => new Date(b.fecha_ingreso).getTime() - new Date(a.fecha_ingreso).getTime());
+}
+
+// Obtener órdenes de un año específico
+export async function obtenerOrdenesPorAnio(year: number): Promise<OrdenDB[]> {
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31, 23, 59, 59);
+    return obtenerOrdenesPorRangoFechas(startDate, endDate);
+}
+
+// Obtener órdenes de un mes específico
+export async function obtenerOrdenesPorMes(
+    year: number,
+    month: number
+): Promise<OrdenDB[]> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+    return obtenerOrdenesPorRangoFechas(startDate, endDate);
 }
 
 export async function obtenerOrdenesPorUsuario(userId: string): Promise<{

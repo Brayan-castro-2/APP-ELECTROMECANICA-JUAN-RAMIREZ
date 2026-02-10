@@ -32,6 +32,8 @@ import {
 } from '@/components/ui/table';
 import { Search, FileText, ChevronRight, Loader2, Trash2, Edit, Download, ChevronDown, Calendar, User, Wrench, DollarSign, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import type { DateRange } from 'react-day-picker';
 // import { NewBadge } from '@/components/ui/new-badge';
 
 export default function OrdenesPage() {
@@ -63,6 +65,7 @@ export default function OrdenesPage() {
     const [mechanicFilter, setMechanicFilter] = useState<string>('all');
     const [debtFilter, setDebtFilter] = useState<string>('all');
     const [dateFilter, setDateFilter] = useState<string>('all');
+    const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
     const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
@@ -263,11 +266,14 @@ export default function OrdenesPage() {
             const matchesDate = dateFilter === 'all' ||
                 (dateFilter === 'today' && isToday(order.fecha_ingreso)) ||
                 (dateFilter === 'week' && isThisWeek(order.fecha_ingreso)) ||
-                (dateFilter === 'month' && isThisMonth(order.fecha_ingreso));
+                (dateFilter === 'month' && isThisMonth(order.fecha_ingreso)) ||
+                (dateFilter === 'custom' && customDateRange?.from && customDateRange?.to &&
+                    new Date(order.fecha_ingreso) >= customDateRange.from &&
+                    new Date(order.fecha_ingreso) <= customDateRange.to);
 
             return matchesSearch && matchesStatus && matchesMechanic && matchesDebt && matchesDate;
         }).sort((a, b) => new Date(b.fecha_ingreso).getTime() - new Date(a.fecha_ingreso).getTime());
-    }, [orders, appointments, viewFilter, searchTerm, statusFilter, mechanicFilter, debtFilter, dateFilter, vehiculosMap, hasDebt, appointmentToOrderFormat, isAppointmentNearby]);
+    }, [orders, appointments, viewFilter, searchTerm, statusFilter, mechanicFilter, debtFilter, dateFilter, customDateRange, vehiculosMap, hasDebt, appointmentToOrderFormat, isAppointmentNearby]);
 
     const handleDeleteOrder = async (item: OrdenDB | CitaDB) => {
         const isOrder = 'patente_vehiculo' in item;
@@ -528,17 +534,48 @@ export default function OrdenesPage() {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs text-slate-400 font-medium px-1">Fecha</label>
-                                <Select value={dateFilter} onValueChange={setDateFilter}>
-                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-xs sm:text-sm h-9">
-                                        <SelectValue placeholder="Todas" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-slate-800 border-slate-700">
-                                        <SelectItem value="all" className="text-slate-200">Todas</SelectItem>
-                                        <SelectItem value="today" className="text-slate-200">Hoy</SelectItem>
-                                        <SelectItem value="week" className="text-slate-200">Semana</SelectItem>
-                                        <SelectItem value="month" className="text-slate-200">Mes</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                {dateFilter === 'custom' ? (
+                                    <div className="space-y-2">
+                                        <DateRangePicker
+                                            value={customDateRange}
+                                            onChange={(range) => {
+                                                setCustomDateRange(range);
+                                                if (!range) {
+                                                    setDateFilter('all');
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full text-xs text-slate-400 hover:text-white h-7"
+                                            onClick={() => {
+                                                setDateFilter('all');
+                                                setCustomDateRange(undefined);
+                                            }}
+                                        >
+                                            Volver a filtros rápidos
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <Select value={dateFilter} onValueChange={(value) => {
+                                        setDateFilter(value);
+                                        if (value !== 'custom') {
+                                            setCustomDateRange(undefined);
+                                        }
+                                    }}>
+                                        <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-xs sm:text-sm h-9">
+                                            <SelectValue placeholder="Todas" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-slate-800 border-slate-700">
+                                            <SelectItem value="all" className="text-slate-200">Todas</SelectItem>
+                                            <SelectItem value="today" className="text-slate-200">Hoy</SelectItem>
+                                            <SelectItem value="week" className="text-slate-200">Semana</SelectItem>
+                                            <SelectItem value="month" className="text-slate-200">Mes</SelectItem>
+                                            <SelectItem value="custom" className="text-slate-200">📅 Rango personalizado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </div>
                         </div>
                         <div className="flex justify-end">

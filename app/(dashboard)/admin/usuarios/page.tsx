@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { obtenerPerfiles, actualizarPerfil, crearUsuario, type PerfilDB } from '@/lib/storage-adapter';
+import { obtenerPerfiles, actualizarPerfil, type PerfilDB } from '@/lib/storage-adapter';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,25 +71,43 @@ export default function UsuariosPage() {
             return;
         }
 
-        if (newPassword.length < 6) {
-            setCreateError('La contraseña debe tener al menos 6 caracteres');
+        if (newPassword.length < 4) {
+            setCreateError('La contraseña debe tener al menos 4 caracteres');
             return;
         }
 
         setIsCreating(true);
         setCreateError('');
 
-        const result = await crearUsuario(newEmail, newPassword, newName, newRole);
+        try {
+            const response = await fetch('/api/usuarios/crear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: newEmail,
+                    password: newPassword,
+                    nombreCompleto: newName,
+                    rol: newRole,
+                }),
+            });
 
-        if (result.success) {
-            setCreateDialogOpen(false);
-            setNewEmail('');
-            setNewPassword('');
-            setNewName('');
-            setNewRole('mecanico');
-            await loadUsuarios();
-        } else {
-            setCreateError(result.error || 'Error al crear usuario');
+            const result = await response.json();
+
+            if (result.success) {
+                setCreateDialogOpen(false);
+                setNewEmail('');
+                setNewPassword('');
+                setNewName('');
+                setNewRole('mecanico');
+                await loadUsuarios();
+            } else {
+                setCreateError(result.error || 'Error al crear usuario');
+            }
+        } catch (error) {
+            console.error('Error al crear usuario:', error);
+            setCreateError('Error de conexión al crear usuario');
         }
 
         setIsCreating(false);
@@ -130,6 +148,105 @@ export default function UsuariosPage() {
                     className="pl-10 bg-[#1a1a1a] border-[#333333] text-white placeholder:text-gray-500 rounded-xl h-12"
                 />
             </div>
+
+            {/* Create User Button */}
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button className="w-full bg-[#0066FF] hover:bg-[#0052CC] text-white rounded-xl h-12">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Crear Nuevo Usuario
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-[#1a1a1a] border-[#333333] text-white">
+                    <DialogHeader>
+                        <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                        <DialogDescription className="text-gray-400">
+                            Ingresa los datos del nuevo usuario del sistema
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Nombre Completo</Label>
+                            <Input
+                                id="name"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="Juan Pérez"
+                                className="bg-[#0a0a0a] border-[#333333] text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Nombre de Usuario</Label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    id="email"
+                                    type="text"
+                                    value={newEmail.replace('@taller.cl', '')}
+                                    onChange={(e) => {
+                                        const username = e.target.value.replace(/@.*$/, '');
+                                        setNewEmail(username + '@taller.cl');
+                                    }}
+                                    placeholder="juanperez"
+                                    className="bg-[#0a0a0a] border-[#333333] text-white flex-1"
+                                />
+                                <span className="text-gray-400 text-sm">@taller.cl</span>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Contraseña</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Mínimo 4 caracteres"
+                                className="bg-[#0a0a0a] border-[#333333] text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="role">Rol</Label>
+                            <Select value={newRole} onValueChange={(value: 'admin' | 'mecanico') => setNewRole(value)}>
+                                <SelectTrigger className="bg-[#0a0a0a] border-[#333333] text-white">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-[#1a1a1a] border-[#333333]">
+                                    <SelectItem value="mecanico">Mecánico</SelectItem>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {createError && (
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                                <p className="text-red-400 text-sm">{createError}</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setCreateDialogOpen(false)}
+                            className="flex-1 border-[#333333] text-white hover:bg-[#0a0a0a]"
+                            disabled={isCreating}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleCreateUser}
+                            className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                            disabled={isCreating}
+                        >
+                            {isCreating ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Creando...
+                                </>
+                            ) : (
+                                'Crear Usuario'
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Users List */}
             <div className="space-y-3">

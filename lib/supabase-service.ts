@@ -1,5 +1,5 @@
 // Servicios de Supabase para operaciones de base de datos
-import { supabase, VehiculoDB, OrdenDB, PerfilDB, CitaDB, OrdenConDetallesDB } from './supabase';
+import { supabase, supabaseAdmin, VehiculoDB, OrdenDB, PerfilDB, CitaDB, OrdenConDetallesDB } from './supabase';
 import { createClient } from '@supabase/supabase-js';
 
 // ============ VEHÍCULOS ============
@@ -487,23 +487,30 @@ export async function crearUsuario(
     rol: 'admin' | 'mecanico'
 ): Promise<{ success: boolean; error?: string; user?: PerfilDB }> {
     try {
-        // 1. Crear usuario en Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // Verificar que supabaseAdmin esté configurado
+        console.log('🔍 Verificando configuración de supabaseAdmin...');
+        console.log('🔍 supabaseAdmin es igual a supabase?', supabaseAdmin === supabase);
+
+        console.log('🔵 Creando usuario con Admin API:', email);
+
+        // 1. Crear usuario en Auth usando Admin API (bypasses signup restrictions)
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
-            options: {
-                emailRedirectTo: undefined,
-                data: {
-                    nombre_completo: nombreCompleto,
-                    rol: rol,
-                }
+            email_confirm: true, // Auto-confirm email
+            user_metadata: {
+                nombre_completo: nombreCompleto,
+                rol: rol,
             }
         });
 
         if (authError || !authData.user) {
-            console.error('Error al crear usuario en Auth:', authError);
+            console.error('❌ Error al crear usuario en Auth:', authError);
+            console.error('❌ Detalles del error:', JSON.stringify(authError, null, 2));
             return { success: false, error: authError?.message || 'Error al crear usuario' };
         }
+
+        console.log('✅ Usuario creado en Auth:', authData.user.id);
 
         // 2. Crear perfil en la tabla perfiles
         const { data: perfilData, error: perfilError } = await supabase
@@ -519,17 +526,70 @@ export async function crearUsuario(
             .single();
 
         if (perfilError) {
-            console.error('Error al crear perfil:', perfilError);
+            console.error('❌ Error al crear perfil:', perfilError);
             // Intentar eliminar el usuario de Auth si falla la creación del perfil
-            await supabase.auth.admin.deleteUser(authData.user.id);
+            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
             return { success: false, error: 'Error al crear perfil de usuario' };
         }
 
         console.log('✅ Usuario creado exitosamente:', perfilData);
         return { success: true, user: perfilData };
     } catch (error) {
-        console.error('Error inesperado al crear usuario:', error);
+        console.error('❌ Error inesperado al crear usuario:', error);
         return { success: false, error: 'Error inesperado al crear usuario' };
+    }
+}
+
+// Cambiar contraseña de un usuario (Admin only)
+export async function cambiarContrasenaUsuario(
+    userId: string,
+    newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        console.log(`🔐 Cambiando contraseña para usuario: ${userId}`);
+
+        // Usar Supabase Admin API para actualizar contraseña
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(
+            userId,
+            { password: newPassword }
+        );
+
+        if (error) {
+            console.error('❌ Error al cambiar contraseña:', error);
+            return { success: false, error: error.message };
+        }
+
+        console.log('✅ Contraseña actualizada exitosamente');
+        return { success: true };
+    } catch (error: any) {
+        console.error('❌ Error inesperado al cambiar contraseña:', error);
+        return { success: false, error: 'Error inesperado al cambiar contraseña' };
+    }
+}
+
+// Eliminar usuario (soft delete - marcar como inactivo)
+export async function eliminarUsuario(
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        console.log(`🗑️ Eliminando usuario (soft delete): ${userId}`);
+
+        // Marcar perfil como inactivo en lugar de eliminar
+        const { error } = await supabase
+            .from('perfiles')
+            .update({ activo: false })
+            .eq('id', userId);
+
+        if (error) {
+            console.error('❌ Error al eliminar usuario:', error);
+            return { success: false, error: error.message };
+        }
+
+        console.log('✅ Usuario marcado como inactivo');
+        return { success: true };
+    } catch (error: any) {
+        console.error('❌ Error inesperado al eliminar usuario:', error);
+        return { success: false, error: 'Error inesperado al eliminar usuario' };
     }
 }
 
@@ -690,6 +750,156 @@ export async function obtenerOrdenesLight(): Promise<OrdenConDetallesDB[]> {
                 modelo: vehiculo.modelo,
                 anio: vehiculo.anio,
                 // Motor y color omitidos para ahorrar
+            } : null,
+            perfiles_creado: creadoPor ? {
+                nombre_completo: creadoPor.nombre_completo,
+                email: creadoPor.email
+            } : null,
+            perfiles_asignado: asignadoA ? {
+                nombre_completo: asignadoA.nombre_completo,
+                email: asignadoA.email
+            } : null
+        };
+    }) as unknown as OrdenConDetallesDB[];
+
+    return ordenesCompletas;
+}
+
+// ============ FILTROS DE FECHA ============
+
+// Obtener órdenes por rango de fechas
+export async function obtenerOrdenesPorRangoFechas(
+    startDate: Date,
+    endDate: Date
+): Promise<OrdenConDetallesDB[]> {
+    console.log('🔵 Obteniendo órdenes por rango:', { startDate, endDate });
+
+    const { data: ordenes, error } = await supabase
+        .from('ordenes')
+        .select('*')
+        .gte('fecha_ingreso', startDate.toISOString())
+        .lte('fecha_ingreso', endDate.toISOString())
+        .order('fecha_ingreso', { ascending: false });
+
+    if (error) {
+        console.error('❌ Error al obtener órdenes por rango:', error);
+        return [];
+    }
+
+    if (!ordenes || ordenes.length === 0) return [];
+
+    // Obtener datos relacionados
+    const patentes = [...new Set(ordenes.map(o => o.patente_vehiculo))];
+    const userIds = [...new Set([
+        ...ordenes.map(o => o.creado_por),
+        ...ordenes.map(o => o.asignado_a).filter(id => id) as string[]
+    ])];
+
+    const [vehiculosRes, perfilesRes] = await Promise.all([
+        supabase.from('vehiculos').select('*').in('patente', patentes),
+        supabase.from('perfiles').select('*').in('id', userIds)
+    ]);
+
+    const vehiculosMap = new Map((vehiculosRes.data || []).map(v => [v.patente, v]));
+    const perfilesMap = new Map((perfilesRes.data || []).map(p => [p.id, p]));
+
+    const ordenesCompletas = ordenes.map(orden => {
+        const vehiculo = vehiculosMap.get(orden.patente_vehiculo);
+        const creadoPor = perfilesMap.get(orden.creado_por);
+        const asignadoA = orden.asignado_a ? perfilesMap.get(orden.asignado_a) : null;
+
+        return {
+            ...orden,
+            vehiculos: vehiculo ? {
+                patente: vehiculo.patente,
+                marca: vehiculo.marca,
+                modelo: vehiculo.modelo,
+                anio: vehiculo.anio,
+                motor: vehiculo.motor,
+                color: vehiculo.color
+            } : null,
+            perfiles_creado: creadoPor ? {
+                nombre_completo: creadoPor.nombre_completo,
+                email: creadoPor.email
+            } : null,
+            perfiles_asignado: asignadoA ? {
+                nombre_completo: asignadoA.nombre_completo,
+                email: asignadoA.email
+            } : null
+        };
+    }) as unknown as OrdenConDetallesDB[];
+
+    return ordenesCompletas;
+}
+
+// Obtener órdenes de un año específico
+export async function obtenerOrdenesPorAnio(year: number): Promise<OrdenConDetallesDB[]> {
+    const startDate = new Date(year, 0, 1); // 1 de enero
+    const endDate = new Date(year, 11, 31, 23, 59, 59); // 31 de diciembre
+    return obtenerOrdenesPorRangoFechas(startDate, endDate);
+}
+
+// Obtener órdenes de un mes específico
+export async function obtenerOrdenesPorMes(
+    year: number,
+    month: number // 1-12
+): Promise<OrdenConDetallesDB[]> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59); // Último día del mes
+    return obtenerOrdenesPorRangoFechas(startDate, endDate);
+}
+
+// ============ ACCESO LIMITADO PARA MECÁNICOS ============
+
+// Obtener órdenes creadas por un mecánico (excluyendo completadas)
+export async function obtenerOrdenesPorMecanico(
+    userId: string
+): Promise<OrdenConDetallesDB[]> {
+    console.log(`🔵 Obteniendo órdenes del mecánico: ${userId}`);
+
+    const { data: ordenes, error } = await supabase
+        .from('ordenes')
+        .select('*')
+        .eq('creado_por', userId)
+        .neq('estado', 'completada') // Excluir completadas
+        .order('fecha_ingreso', { ascending: false });
+
+    if (error) {
+        console.error('❌ Error al obtener órdenes del mecánico:', error);
+        return [];
+    }
+
+    if (!ordenes || ordenes.length === 0) return [];
+
+    // Obtener datos relacionados
+    const patentes = [...new Set(ordenes.map(o => o.patente_vehiculo))];
+    const userIds = [...new Set([
+        ...ordenes.map(o => o.creado_por),
+        ...ordenes.map(o => o.asignado_a).filter(id => id) as string[]
+    ])];
+
+    const [vehiculosRes, perfilesRes] = await Promise.all([
+        supabase.from('vehiculos').select('*').in('patente', patentes),
+        supabase.from('perfiles').select('*').in('id', userIds)
+    ]);
+
+    const vehiculosMap = new Map((vehiculosRes.data || []).map(v => [v.patente, v]));
+    const perfilesMap = new Map((perfilesRes.data || []).map(p => [p.id, p]));
+
+    const ordenesCompletas = ordenes.map(orden => {
+        const vehiculo = vehiculosMap.get(orden.patente_vehiculo);
+        const creadoPor = perfilesMap.get(orden.creado_por);
+        const asignadoA = orden.asignado_a ? perfilesMap.get(orden.asignado_a) : null;
+
+        return {
+            ...orden,
+            vehiculos: vehiculo ? {
+                patente: vehiculo.patente,
+                marca: vehiculo.marca,
+                modelo: vehiculo.modelo,
+                anio: vehiculo.anio,
+                motor: vehiculo.motor,
+                color: vehiculo.color
             } : null,
             perfiles_creado: creadoPor ? {
                 nombre_completo: creadoPor.nombre_completo,

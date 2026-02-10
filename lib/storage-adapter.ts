@@ -66,6 +66,38 @@ export async function obtenerOrdenesLight(): Promise<OrdenConDetallesDB[]> {
     return localService.obtenerOrdenesLight();
 }
 
+// ============ FILTROS DE FECHA ============
+
+export async function obtenerOrdenesPorRangoFechas(
+    startDate: Date,
+    endDate: Date
+): Promise<OrdenConDetallesDB[]> {
+    if (isSupabase()) {
+        return supabaseService.obtenerOrdenesPorRangoFechas(startDate, endDate);
+    }
+    const ordenes = await localService.obtenerOrdenesPorRangoFechas(startDate, endDate);
+    return ordenes as unknown as OrdenConDetallesDB[];
+}
+
+export async function obtenerOrdenesPorAnio(year: number): Promise<OrdenConDetallesDB[]> {
+    if (isSupabase()) {
+        return supabaseService.obtenerOrdenesPorAnio(year);
+    }
+    const ordenes = await localService.obtenerOrdenesPorAnio(year);
+    return ordenes as unknown as OrdenConDetallesDB[];
+}
+
+export async function obtenerOrdenesPorMes(
+    year: number,
+    month: number
+): Promise<OrdenConDetallesDB[]> {
+    if (isSupabase()) {
+        return supabaseService.obtenerOrdenesPorMes(year, month);
+    }
+    const ordenes = await localService.obtenerOrdenesPorMes(year, month);
+    return ordenes as unknown as OrdenConDetallesDB[];
+}
+
 export async function obtenerOrdenesHoy(): Promise<OrdenDB[]> {
     if (isSupabase()) {
         console.log('🔵 Usando Supabase para obtener órdenes de hoy');
@@ -168,6 +200,39 @@ export async function crearUsuario(
     return localService.crearUsuario(email, password, nombreCompleto, rol);
 }
 
+// Cambiar contraseña de usuario
+export async function cambiarContrasenaUsuario(
+    userId: string,
+    newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+    if (isSupabase()) {
+        console.log('🔵 Usando Supabase para cambiar contraseña');
+        return supabaseService.cambiarContrasenaUsuario(userId, newPassword);
+    }
+    console.log('🟡 Usando localStorage para cambiar contraseña');
+    // TODO: Implementar en localStorage si es necesario
+    return { success: false, error: 'No implementado en localStorage' };
+}
+
+// Eliminar usuario (soft delete)
+export async function eliminarUsuario(
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    if (isSupabase()) {
+        console.log('🔵 Usando Supabase para eliminar usuario');
+        return supabaseService.eliminarUsuario(userId);
+    }
+    console.log('🟡 Usando localStorage para eliminar usuario');
+    // Implementación simple para localStorage
+    const perfiles = await localService.obtenerPerfiles();
+    const perfil = perfiles.find(p => p.id === userId);
+    if (!perfil) {
+        return { success: false, error: 'Usuario no encontrado' };
+    }
+    await localService.actualizarPerfil(userId, { activo: false });
+    return { success: true };
+}
+
 // ============ AUTENTICACIÓN ============
 
 export async function loginConCredenciales(email: string, password: string): Promise<{
@@ -248,6 +313,22 @@ export function inicializarLocalStorage(): void {
     if (!isSupabase()) {
         localService.initializeLocalStorage();
     }
+}
+
+// ============ ACCESO LIMITADO PARA MECÁNICOS ============
+
+export async function obtenerOrdenesPorMecanico(
+    userId: string
+): Promise<OrdenConDetallesDB[]> {
+    if (isSupabase()) {
+        return supabaseService.obtenerOrdenesPorMecanico(userId);
+    }
+    // Para localStorage, filtrar órdenes creadas por el usuario y excluir completadas
+    const ordenes = await localService.obtenerOrdenes();
+    const filtered = ordenes.filter(o =>
+        o.creado_por === userId && o.estado !== 'completada'
+    );
+    return filtered as unknown as OrdenConDetallesDB[];
 }
 
 // Re-exportar tipos

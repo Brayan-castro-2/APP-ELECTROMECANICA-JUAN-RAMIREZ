@@ -30,6 +30,12 @@ const navItems: NavItem[] = [
         roles: ['mecanico', 'admin'],
     },
     {
+        href: '/mecanico/ordenes',
+        label: 'Mis Órdenes',
+        icon: <FileText className="w-5 h-5" />,
+        roles: ['mecanico'],
+    },
+    {
         href: '/admin',
         label: 'Dashboard',
         icon: <LayoutDashboard className="w-5 h-5" />,

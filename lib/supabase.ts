@@ -3,7 +3,21 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://juyskcnwdpfnchytjfjq.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eXNrY253ZHBmbmNoeXRqZmpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1MTQ0MjAsImV4cCI6MjA4MjA5MDQyMH0.g2ltE7bxoatObkNe17_A7niU2moUvZq9tsx-wV6DMe0'
 
+// Cliente normal para operaciones de usuario
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Cliente admin para operaciones administrativas (cambiar contraseñas, etc.)
+// ⚠️ IMPORTANTE: Necesitas agregar SUPABASE_SERVICE_ROLE_KEY a tu .env
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+export const supabaseAdmin = supabaseServiceRoleKey
+    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    })
+    : supabase; // Fallback al cliente normal si no hay service key
 
 // Tipos para las tablas de Supabase
 export interface VehiculoDB {

@@ -36,6 +36,8 @@ import { DebtSummaryCard } from '@/components/analytics/debt-summary-card';
 import { FEATURE_FLAGS } from '@/config/modules';
 // import { NewBadge } from '@/components/ui/new-badge';
 import { UpcomingAppointments } from '@/components/agenda/upcoming-appointments';
+import { DateRangeFilter } from '@/components/filters/date-range-filter';
+import type { DateFilter } from '@/lib/types/filters';
 
 // Skeleton loader para stats
 function StatsSkeleton() {
@@ -59,9 +61,21 @@ export default function AdminPage() {
     // const [perfiles, setPerfiles] = useState<PerfilDB[]>([]);
     // const [vehiculos, setVehiculos] = useState<VehiculoDB[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [dateFilter, setDateFilter] = useState<DateFilter | null>(null);
 
     const isLoading = isLoadingOrders;
     const canViewPrices = user?.name?.toLowerCase().includes('juan');
+
+    // Filtrar órdenes según el filtro de fecha activo
+    const filteredOrders = useMemo(() => {
+        if (!dateFilter || !dateFilter.startDate || !dateFilter.endDate) {
+            return allOrders;
+        }
+        return allOrders.filter((order: any) => {
+            const orderDate = new Date(order.fecha_ingreso);
+            return orderDate >= dateFilter.startDate! && orderDate <= dateFilter.endDate!;
+        });
+    }, [allOrders, dateFilter]);
 
     const todaysOrders = useMemo(() => {
         const hoy = new Date();
@@ -82,20 +96,16 @@ export default function AdminPage() {
     }, []);
 
     const stats = useMemo(() => {
-        const now = new Date();
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const ordersThisMonth = allOrders.filter((o: any) => {
-            const orderDate = new Date(o.fecha_ingreso);
-            return orderDate >= firstDayOfMonth;
-        });
+        const orders = filteredOrders; // Usar órdenes filtradas en lugar de allOrders
 
         return {
-            todayRevenue: todaysOrders.reduce((acc: number, o: any) => acc + (o.precio_total || 0), 0),
-            pending: allOrders.filter((o: any) => o.estado === 'pendiente').length,
-            monthlyRevenue: ordersThisMonth.reduce((acc: number, o: any) => acc + (o.precio_total || 0), 0),
-            completed: allOrders.filter((o: any) => o.estado === 'completada').length,
+            totalOrders: orders.length,
+            totalRevenue: orders.reduce((acc: number, o: any) => acc + (o.precio_total || 0), 0),
+            pending: orders.filter((o: any) => o.estado === 'pendiente').length,
+            completed: orders.filter((o: any) => o.estado === 'completada').length,
+            inProgress: orders.filter((o: any) => o.estado === 'en_progreso').length,
         };
-    }, [todaysOrders, allOrders]);
+    }, [filteredOrders]);
 
     // Calcular rendimiento de mecánicos usando los datos anidados
     const mechanicPerformance = useMemo(() => {
@@ -171,6 +181,13 @@ export default function AdminPage() {
                 </Button>
             </div>
 
+            {/* Filtro de Fechas */}
+            <DateRangeFilter
+                onFilterChange={setDateFilter}
+                totalOrders={stats.totalOrders}
+                totalRevenue={stats.totalRevenue}
+            />
+
             {/* Stats Grid */}
             {isLoading ? (
                 <StatsSkeleton />
@@ -183,8 +200,8 @@ export default function AdminPage() {
                                     <Car className="w-5 h-5 sm:w-6 sm:h-6 text-blue-200" />
                                     <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-blue-200" />
                                 </div>
-                                <p className="text-xl sm:text-3xl font-bold text-white">${stats.todayRevenue.toLocaleString('es-CL')}</p>
-                                <p className="text-xs sm:text-sm text-blue-200">Ingresos Hoy</p>
+                                <p className="text-xl sm:text-3xl font-bold text-white">${stats.totalRevenue.toLocaleString('es-CL')}</p>
+                                <p className="text-xs sm:text-sm text-blue-200">{dateFilter ? 'Ingresos Filtrados' : 'Ingresos Totales'}</p>
                             </CardContent>
                         </Card>
                     )}
@@ -198,11 +215,11 @@ export default function AdminPage() {
                     </Card>
 
                     {canViewPrices && (
-                        <Card className="bg-[#1a1a1a] border border-[#333333]">
+                        <Card className="bg-[#0066FF]/80 border-0">
                             <CardContent className="p-3 sm:p-4">
-                                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 mb-2" />
-                                <p className="text-xl sm:text-3xl font-bold text-white">${stats.monthlyRevenue.toLocaleString('es-CL')}</p>
-                                <p className="text-xs sm:text-sm text-gray-400">Monto Mensual</p>
+                                <Wrench className="w-5 h-5 sm:w-6 sm:h-6 text-blue-200 mb-2" />
+                                <p className="text-xl sm:text-3xl font-bold text-white">{stats.inProgress}</p>
+                                <p className="text-xs sm:text-sm text-blue-200">En Progreso</p>
                             </CardContent>
                         </Card>
                     )}

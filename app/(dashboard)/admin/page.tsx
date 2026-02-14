@@ -112,15 +112,17 @@ export default function AdminPage() {
         return {
             totalRevenue: allOrders.reduce((acc: number, o: any) => acc + (o.precio_total || 0), 0),
             completed: allOrders.filter((o: any) => o.estado === 'completada').length,
+            pending: allOrders.filter((o: any) => o.estado === 'pendiente').length,
         };
     }, [allOrders]);
 
-    // Calcular rendimiento de mecánicos usando los datos anidados
+    // Calcular rendimiento de mecánicos usando los datos filtrados
     const mechanicPerformance = useMemo(() => {
         // Extraer mecánicos únicos de las órdenes
         const mechanicsMap = new Map();
 
-        allOrders.forEach((order: any) => {
+        // Usar filteredOrders en lugar de allOrders para respetar el filtro de fecha
+        filteredOrders.forEach((order: any) => {
             if (order.asignado_a && order.perfiles_asignado) {
                 if (!mechanicsMap.has(order.asignado_a)) {
                     mechanicsMap.set(order.asignado_a, {
@@ -234,6 +236,11 @@ export default function AdminPage() {
                             <div className="space-y-1">
                                 <p className="text-sm text-amber-100 font-medium">Pendientes</p>
                                 <h3 className="text-2xl sm:text-3xl font-bold text-white">{stats.pending}</h3>
+                                {dateFilter && (
+                                    <p className="text-xs text-amber-100 opacity-80 pt-1">
+                                        Histórico: {historicalStats.pending}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -288,12 +295,12 @@ export default function AdminPage() {
 
                         {/* Charts Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <RevenueChart orders={allOrders} />
-                            <StatusChart orders={allOrders} />
+                            <RevenueChart orders={filteredOrders} />
+                            <StatusChart orders={filteredOrders} />
                         </div>
 
                         {/* Debt Summary */}
-                        <DebtSummaryCard orders={allOrders} />
+                        <DebtSummaryCard orders={filteredOrders} />
                     </div>
                 )
             }

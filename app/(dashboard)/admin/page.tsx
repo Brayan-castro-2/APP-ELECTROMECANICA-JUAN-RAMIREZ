@@ -107,6 +107,14 @@ export default function AdminPage() {
         };
     }, [filteredOrders]);
 
+    // Calcular estadísticas históricas (sin filtro de fecha)
+    const historicalStats = useMemo(() => {
+        return {
+            totalRevenue: allOrders.reduce((acc: number, o: any) => acc + (o.precio_total || 0), 0),
+            completed: allOrders.filter((o: any) => o.estado === 'completada').length,
+        };
+    }, [allOrders]);
+
     // Calcular rendimiento de mecánicos usando los datos anidados
     const mechanicPerformance = useMemo(() => {
         // Extraer mecánicos únicos de las órdenes
@@ -198,37 +206,70 @@ export default function AdminPage() {
                             <CardContent className="p-3 sm:p-4">
                                 <div className="flex items-center justify-between mb-2">
                                     <Car className="w-5 h-5 sm:w-6 sm:h-6 text-blue-200" />
-                                    <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-blue-200" />
+                                    <TrendingUp className="w-4 h-4 text-blue-200" />
                                 </div>
-                                <p className="text-xl sm:text-3xl font-bold text-white">${stats.totalRevenue.toLocaleString('es-CL')}</p>
-                                <p className="text-xs sm:text-sm text-blue-200">{dateFilter ? 'Ingresos Filtrados' : 'Ingresos Totales'}</p>
+                                <div className="space-y-1">
+                                    <p className="text-sm text-blue-100 font-medium">Ingresos</p>
+                                    <h3 className="text-2xl sm:text-3xl font-bold text-white">
+                                        ${stats.totalRevenue.toLocaleString('es-CL')}
+                                    </h3>
+                                    {dateFilter && (
+                                        <p className="text-xs text-blue-200 opacity-80 pt-1">
+                                            Histórico: ${historicalStats.totalRevenue.toLocaleString('es-CL')}
+                                        </p>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     )}
 
                     <Card className="bg-amber-500 border-0 shadow-xl shadow-amber-500/20">
                         <CardContent className="p-3 sm:p-4">
-                            <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-amber-200 mb-2" />
-                            <p className="text-xl sm:text-3xl font-bold text-white">{stats.pending}</p>
-                            <p className="text-xs sm:text-sm text-amber-200">Pendientes</p>
+                            <div className="flex items-center justify-between mb-2">
+                                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-amber-100" />
+                                <span className="p-1.5 bg-amber-400/30 rounded-lg">
+                                    <span className="animate-pulse w-2 h-2 bg-white rounded-full block" />
+                                </span>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm text-amber-100 font-medium">Pendientes</p>
+                                <h3 className="text-2xl sm:text-3xl font-bold text-white">{stats.pending}</h3>
+                            </div>
                         </CardContent>
                     </Card>
 
-                    {canViewPrices && (
-                        <Card className="bg-[#0066FF]/80 border-0">
-                            <CardContent className="p-3 sm:p-4">
-                                <Wrench className="w-5 h-5 sm:w-6 sm:h-6 text-blue-200 mb-2" />
-                                <p className="text-xl sm:text-3xl font-bold text-white">{stats.inProgress}</p>
-                                <p className="text-xs sm:text-sm text-blue-200">En Progreso</p>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    <Card className="bg-green-600 border-0 shadow-xl shadow-green-500/20">
+                    <Card className="col-span-2 sm:col-span-1 bg-green-500 border-0 shadow-xl shadow-green-500/20">
                         <CardContent className="p-3 sm:p-4">
-                            <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-200 mb-2" />
-                            <p className="text-xl sm:text-3xl font-bold text-white">{stats.completed}</p>
-                            <p className="text-xs sm:text-sm text-green-200">Completadas</p>
+                            <div className="flex items-center justify-between mb-2">
+                                <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-100" />
+                                <Badge variant="secondary" className="bg-green-400/30 text-white border-0">
+                                    {Math.round((stats.completed / (stats.totalOrders || 1)) * 100)}%
+                                </Badge>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm text-green-100 font-medium">Completadas</p>
+                                <h3 className="text-2xl sm:text-3xl font-bold text-white">{stats.completed}</h3>
+                                {dateFilter && (
+                                    <p className="text-xs text-green-100 opacity-80 pt-1">
+                                        Histórico: {historicalStats.completed}
+                                    </p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="col-span-2 sm:col-span-1 bg-[#1a1a1a] border border-[#333]">
+                        <CardContent className="p-3 sm:p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <Wrench className="w-5 h-5 sm:w-6 sm:h-6 text-[#0066FF]" />
+                                <Badge variant="outline" className="border-[#333] text-gray-400">
+                                    Total
+                                </Badge>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm text-gray-400 font-medium">En Taller</p>
+                                <h3 className="text-2xl sm:text-3xl font-bold text-white">{stats.inProgress}</h3>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

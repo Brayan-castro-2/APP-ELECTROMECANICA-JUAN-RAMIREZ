@@ -33,7 +33,6 @@ import {
 import { Search, FileText, ChevronRight, Loader2, Trash2, Edit, Download, ChevronDown, Calendar, User, Wrench, DollarSign, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import type { DateRange } from 'react-day-picker';
 // import { NewBadge } from '@/components/ui/new-badge';
 
 export default function OrdenesPage() {
@@ -65,7 +64,7 @@ export default function OrdenesPage() {
     const [mechanicFilter, setMechanicFilter] = useState<string>('all');
     const [debtFilter, setDebtFilter] = useState<string>('all');
     const [dateFilter, setDateFilter] = useState<string>('all');
-    const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+    const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date } | undefined>();
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
     const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 

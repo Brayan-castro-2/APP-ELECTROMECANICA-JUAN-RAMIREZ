@@ -860,8 +860,7 @@ export async function obtenerOrdenesPorMecanico(
     const { data: ordenes, error } = await supabase
         .from('ordenes')
         .select('*')
-        .eq('creado_por', userId)
-        .neq('estado', 'completada') // Excluir completadas
+        .or(`creado_por.eq.${userId},asignado_a.eq.${userId}`)
         .order('fecha_ingreso', { ascending: false });
 
     if (error) {

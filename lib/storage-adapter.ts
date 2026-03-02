@@ -326,7 +326,7 @@ export async function obtenerOrdenesPorMecanico(
     // Para localStorage, filtrar órdenes creadas por el usuario y excluir completadas
     const ordenes = await localService.obtenerOrdenes();
     const filtered = ordenes.filter(o =>
-        o.creado_por === userId && o.estado !== 'completada'
+        (o.creado_por === userId || o.asignado_a === userId)
     );
     return filtered as unknown as OrdenConDetallesDB[];
 }

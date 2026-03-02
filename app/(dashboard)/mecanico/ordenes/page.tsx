@@ -81,7 +81,7 @@ export default function MecanicoOrdenesPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-white">Mis Órdenes</h1>
                     <p className="text-sm text-gray-400">
-                        Órdenes que has creado (sin incluir completadas)
+                        Todas tus órdenes creadas y asignadas
                     </p>
                 </div>
             </div>

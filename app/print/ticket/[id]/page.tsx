@@ -63,7 +63,11 @@ export default function TicketPage() {
         window.print();
     };
 
-    // Imprimir en impresora térmica Bluetooth (JP80H) via ESC/POS
+    // ============================================================
+    // Imprimir en JP80H via QZ Tray (funciona desde Vercel/producción)
+    // QZ Tray es una app de escritorio que corre en la PC del taller.
+    // El navegador se conecta a ella via WebSocket local.
+    // ============================================================
     const handleBluetoothPrint = async () => {
         if (!orden) return;
         setIsBtPrinting(true);
@@ -71,7 +75,9 @@ export default function TicketPage() {
         setBtMessage('');
 
         try {
-            const payload = {
+            const { imprimirConQZ } = await import('@/lib/qz-print');
+
+            const datos = {
                 ordenId: orden.id,
                 clienteNombre: orden.cliente_nombre,
                 clienteTelefono: orden.cliente_telefono,
@@ -86,31 +92,28 @@ export default function TicketPage() {
                 atendidoPor: mecanico?.nombre_completo?.split(' ')[0] || null,
             };
 
-            const res = await fetch('/api/print/ticket', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            // El nombre de la impresora en Windows — se puede configurar en .env si es diferente
+            const printerName = process.env.NEXT_PUBLIC_PRINTER_NAME || 'JP80H';
+            await imprimirConQZ(datos, printerName);
 
-            const result = await res.json();
+            setBtStatus('success');
+            setBtMessage(`¡Ticket #${orden.id} enviado a la impresora! ✓`);
 
-            if (res.ok && result.success) {
-                setBtStatus('success');
-                setBtMessage(result.message || '¡Ticket enviado a la impresora!');
-            } else {
-                setBtStatus('error');
-                // Mostrar error principal + detalle técnico (qué puerto falló) para diagnóstico
-                const errorMsg = result.error || 'Error al imprimir';
-                const detail = result.detail ? `\n📋 ${result.detail}` : '';
-                setBtMessage(errorMsg + detail);
-            }
         } catch (err: any) {
             setBtStatus('error');
-            setBtMessage('Error de red: ' + (err.message || 'No se pudo conectar al servidor'));
+            const msg = err?.message || String(err);
+
+            // Mensaje amigable según el tipo de error
+            if (msg.includes('Unable to establish') || msg.includes('ECONNREFUSED') || msg.includes('connect')) {
+                setBtMessage('QZ Tray no está corriendo. Descarga e instala QZ Tray en la PC del taller (qz.io), luego vuelve a intentar.');
+            } else if (msg.includes('not found') || msg.includes('No matching')) {
+                setBtMessage(`Impresora "JP80H" no encontrada en QZ Tray. Verifica que esté instalada en Windows.`);
+            } else {
+                setBtMessage(`Error: ${msg}`);
+            }
         } finally {
             setIsBtPrinting(false);
-            // Auto-resetear el mensaje después de 10 segundos (más tiempo para leer el error)
-            setTimeout(() => setBtStatus('idle'), 10000);
+            setTimeout(() => setBtStatus('idle'), 12000);
         }
     };
 

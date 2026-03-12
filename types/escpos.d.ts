@@ -36,3 +36,6 @@ declare module 'escpos-network' {
     }
     export default Network;
 }
+
+// QZ Tray - bridge entre web y hardware de impresión (sin tipos oficiales)
+declare module 'qz-tray';

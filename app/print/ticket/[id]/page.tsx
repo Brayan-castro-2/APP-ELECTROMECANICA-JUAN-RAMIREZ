@@ -109,13 +109,53 @@ export default function TicketPage() {
                 }
 
             } else {
-                // ── PRODUCCIÓN: usar QZ Tray (app local en la PC del taller) ──
-                const { imprimirConQZ } = await import('@/lib/qz-print');
-                const printerName = process.env.NEXT_PUBLIC_PRINTER_NAME || 'JP80H';
-                await imprimirConQZ(datos, printerName);
-                setBtStatus('success');
-                setBtMessage(`¡Ticket #${orden.id} enviado a la impresora! ✓`);
+                // ── PRODUCCIÓN (Vercel): servidor local en localhost:3001 → QZ Tray ──
+                // El navegador llama al servidor de impresión que corre en la PC del taller.
+                let printedOk = false;
+
+                // Intentar primero el servidor standalone (print-server.js)
+                try {
+                    const res = await fetch('http://localhost:3001/print', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(datos),
+                        signal: AbortSignal.timeout(8000),
+                    });
+                    const result = await res.json();
+                    if (res.ok && result.success) {
+                        setBtStatus('success');
+                        setBtMessage(`¡Ticket #${orden.id} impreso! (${result.method || 'servidor local'}) ✓`);
+                        printedOk = true;
+                    } else {
+                        throw new Error(result.error || 'Error del servidor local');
+                    }
+                } catch (localErr: any) {
+                    const localMsg = localErr?.message || '';
+                    // Si el servidor no está corriendo, intentar QZ Tray como fallback
+                    if (localMsg.includes('fetch') || localMsg.includes('Failed') || localMsg.includes('refused') || localMsg.includes('abort')) {
+                        try {
+                            const { imprimirConQZ } = await import('@/lib/qz-print');
+                            const printerName = process.env.NEXT_PUBLIC_PRINTER_NAME || 'JP80H';
+                            await imprimirConQZ(datos, printerName);
+                            setBtStatus('success');
+                            setBtMessage(`¡Ticket #${orden.id} enviado a la impresora! ✓`);
+                            printedOk = true;
+                        } catch {
+                            // Ambos fallaron
+                            throw new Error(
+                                'Para imprimir desde Vercel necesitas el servidor local:\n' +
+                                '1. Abre la carpeta "tools" del proyecto\n' +
+                                '2. Haz doble clic en "iniciar-impresion.bat"\n' +
+                                '3. Deja esa ventana abierta y vuelve a intentar'
+                            );
+                        }
+                    } else {
+                        throw localErr;
+                    }
+                }
+                if (!printedOk) throw new Error('No se pudo imprimir');
             }
+
 
         } catch (err: any) {
             setBtStatus('error');

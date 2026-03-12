@@ -224,10 +224,11 @@ export default function TicketPage() {
             <div ref={ticketRef} className="bg-white text-black w-[320px] p-4 shadow-xl print:shadow-none print:w-full print:p-0 font-mono text-sm leading-tight ticket-container">
                 {/* Header with Logo */}
                 <div className="text-center mb-4 border-b border-dashed border-black pb-4">
+                    {/* Logo */}
                     <div className="flex justify-center mb-3">
-                        <div className="relative w-40 h-40">
+                        <div className="relative w-44 h-44">
                             <Image
-                                src="/images/LOGO ticket(fondo blanco).png"
+                                src="/images/logo-ticket-2.png"
                                 alt="Electromecánica JR"
                                 fill
                                 className="object-contain"
@@ -235,10 +236,19 @@ export default function TicketPage() {
                             />
                         </div>
                     </div>
-                    <h1 className="text-xl font-bold uppercase mb-1">Electromecánica</h1>
-                    <h2 className="text-2xl font-bold uppercase mb-2">JR</h2>
-                    <p className="text-xs">Fecha: {new Date().toLocaleString('es-CL')}</p>
-                    <p className="text-xs">Ticket #: {orden.id}</p>
+                    {/* Datos legales de la empresa */}
+                    <p className="text-[10px] font-bold uppercase leading-tight">ELECTROMECANICA JR. SPA</p>
+                    <p className="text-[9px] uppercase leading-tight mt-0.5">SERVICIO DE MECANICA, ELECTRONICA AUTOMOTRIZ</p>
+                    <p className="text-[9px] uppercase leading-tight">Y GRUAS</p>
+                    <p className="text-[9px] uppercase leading-tight mt-0.5">ACTIVIDADES DE SERVICIOS VINCULADAS</p>
+                    <p className="text-[9px] uppercase leading-tight">AL TRANSPORTE TERRESTRE N.C.P.</p>
+                    <p className="text-[9px] uppercase leading-tight mt-0.5">A INMAR 2280 L IND SEC 2, PUERTO MONTT</p>
+                    <p className="text-[9px] leading-tight">electromecanicajr.spa@gmail.com</p>
+                    {/* Info del ticket */}
+                    <div className="border-t border-dashed border-black mt-2 pt-2">
+                        <p className="text-xs">Fecha: {new Date().toLocaleString('es-CL')}</p>
+                        <p className="text-xs">Ticket #: {orden.id}</p>
+                    </div>
                 </div>
 
                 {/* Client & Vehicle */}

@@ -1,22 +1,26 @@
 /**
  * printer-service.ts
  * Servicio de impresión ESC/POS para impresora JP80H via Bluetooth (COM port) en Windows.
+ * Incluye impresión de logo como imagen raster ESC/POS.
  *
- * Estrategia:
- * 1. Intenta por COM port usando serialport (Bluetooth emparejado en Windows)
- * 2. Si falla COM3, intenta COM5 (el otro puerto del par Bluetooth)
- * 3. Si todo falla, lanza error descriptivo
- *
- * Prerequisitos: npm install serialport escpos escpos-usb escpos-network
+ * Prerequisitos: npm install serialport jimp
  */
+
+import path from 'path';
 
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
 const COM_PORT_PRIMARY = process.env.PRINTER_COM_PORT || 'COM3';
 const COM_PORT_SECONDARY = process.env.PRINTER_COM_PORT_2 || 'COM5';
-const BAUD_RATE = 9600;   // Velocidad estándar para impresoras Bluetooth
+const BAUD_RATE = 9600;
 const CHARS_PER_LINE = 32;
+// Ancho de impresión en píxeles para JP80H a 203 DPI con 80mm → 480px. 
+// Usamos 256 para compatibilidad y tamaño razonable del logo
+const LOGO_PRINT_WIDTH = 256;
+
+// Ruta del logo relativa a la raíz del proyecto Next.js (corre en el server)
+const LOGO_PATH = path.join(process.cwd(), 'imagenes', 'LOGO ticket(fondo blanco) 2.PNG');
 
 // ============================================================
 // TIPOS
@@ -41,7 +45,7 @@ export type PrintResult =
     | { success: false; error: string; tip?: string; detail?: string };
 
 // ============================================================
-// HELPERS DE FORMATO (texto puro, sin ESC/POS aún)
+// HELPERS DE FORMATO
 // ============================================================
 function center(text: string, width = CHARS_PER_LINE): string {
     if (text.length >= width) return text.substring(0, width);
@@ -74,9 +78,80 @@ const DIVIDER = '-'.repeat(CHARS_PER_LINE);
 const DIVIDER2 = '='.repeat(CHARS_PER_LINE);
 
 // ============================================================
+// CONVERSIÓN DE IMAGEN A BITMAP ESC/POS RASTER (GS v 0)
+// ============================================================
+/**
+ * Convierte una imagen a buffer ESC/POS raster (GS v 0).
+ * La imagen se escala a LOGO_PRINT_WIDTH y se convierte a 1-bit (blanco/negro).
+ * Retorna null si hay error (la impresión continúa sin logo).
+ */
+async function buildLogoBuffer(): Promise<Buffer | null> {
+    try {
+        const Jimp = await import('jimp') as any;
+        const img = await Jimp.read(LOGO_PATH);
+
+        // Escalar manteniendo proporción
+        const ratio = img.getHeight() / img.getWidth();
+        const printWidth = LOGO_PRINT_WIDTH;
+        const printHeight = Math.round(printWidth * ratio);
+
+        img.resize(printWidth, printHeight);
+        img.greyscale();
+        img.contrast(0.3); // Aumenta contraste para mejor impresión
+
+        // Alinear ancho a múltiplo de 8 (requerimiento ESC/POS)
+        const widthBytes = Math.ceil(printWidth / 8);
+        const alignedWidth = widthBytes * 8;
+
+        const rasterData: number[] = [];
+
+        for (let y = 0; y < printHeight; y++) {
+            for (let xByte = 0; xByte < widthBytes; xByte++) {
+                let byte = 0;
+                for (let bit = 0; bit < 8; bit++) {
+                    const x = xByte * 8 + bit;
+                    if (x < printWidth) {
+                        const pixel = Jimp.intToRGBA(img.getPixelColor(x, y));
+                        const brightness = (pixel.r + pixel.g + pixel.b) / 3;
+                        // Píxel oscuro (< 128) → bit 1 (imprime), claro → bit 0
+                        if (brightness < 128) {
+                            byte |= (0x80 >> bit);
+                        }
+                    }
+                }
+                rasterData.push(byte);
+            }
+        }
+
+        // Construir comando ESC/POS: GS v 0
+        // GS 0x76 0x30 m xL xH yL yH [data]
+        // m=0 (normal), x = widthBytes, y = printHeight
+        const GS = 0x1d;
+        const xL = widthBytes & 0xFF;
+        const xH = (widthBytes >> 8) & 0xFF;
+        const yL = printHeight & 0xFF;
+        const yH = (printHeight >> 8) & 0xFF;
+
+        const header = Buffer.from([GS, 0x76, 0x30, 0x00, xL, xH, yL, yH]);
+        const data = Buffer.from(rasterData);
+
+        // Centrar logo: GS L (left margin) en función del ancho de papel
+        // Para 80mm (576 dots) centramos el logo de LOGO_PRINT_WIDTH dots
+        const leftMarginDots = Math.max(0, Math.floor((576 - printWidth) / 2));
+        const centerCmd = Buffer.from([GS, 0x4C, leftMarginDots & 0xFF, (leftMarginDots >> 8) & 0xFF]);
+
+        return Buffer.concat([centerCmd, header, data]);
+
+    } catch (err) {
+        console.warn('⚠️  No se pudo procesar el logo para impresión:', (err as Error).message);
+        return null;
+    }
+}
+
+// ============================================================
 // BUILDER DE BUFFER ESC/POS
 // ============================================================
-function buildEscPosBuffer(datos: TicketDatos): Buffer {
+async function buildEscPosBuffer(datos: TicketDatos): Promise<Buffer> {
     const ESC = 0x1b;
     const GS = 0x1d;
     const LF = 0x0a;
@@ -85,17 +160,30 @@ function buildEscPosBuffer(datos: TicketDatos): Buffer {
     const t = (s: string) => Buffer.from(s + '\n', 'ascii');
 
     // Init + PC437
-    chunks.push(Buffer.from([ESC, 0x40]));       // Init
-    chunks.push(Buffer.from([ESC, 0x74, 0x00])); // PC437 encoding
-    chunks.push(Buffer.from([ESC, 0x61, 0x01])); // Centrar
+    chunks.push(Buffer.from([ESC, 0x40]));       // Init impresora
+    chunks.push(Buffer.from([ESC, 0x74, 0x00])); // Encoding PC437
 
-    // Encabezado en negrita + doble alto
+    // --- LOGO (imagen raster) ---
+    chunks.push(Buffer.from([ESC, 0x61, 0x01])); // Centrar
+    const logoBuffer = await buildLogoBuffer();
+    if (logoBuffer) {
+        chunks.push(logoBuffer);
+        chunks.push(Buffer.from([LF]));          // Espaciado después del logo
+    }
+
+    // --- TEXTO DE EMPRESA ---
+    chunks.push(Buffer.from([ESC, 0x61, 0x01])); // Centrar
     chunks.push(Buffer.from([ESC, 0x45, 0x01])); // Bold ON
-    chunks.push(Buffer.from([ESC, 0x21, 0x10])); // Doble alto
-    chunks.push(t('ELECTROMECANICA JR'));
-    chunks.push(Buffer.from([ESC, 0x21, 0x00])); // Normal size
+    chunks.push(t('ELECTROMECANICA JR. SPA'));
     chunks.push(Buffer.from([ESC, 0x45, 0x00])); // Bold OFF
-    chunks.push(t('Taller Mecanico'));
+    chunks.push(t('SERVICIO DE MECANICA,'));
+    chunks.push(t('ELECTRONICA AUTOMOTRIZ Y GRUAS'));
+    chunks.push(t('ACTIVIDADES DE SERVICIOS'));
+    chunks.push(t('VINCULADAS AL TRANSPORTE'));
+    chunks.push(t('TERRESTRE N.C.P.'));
+    chunks.push(t('A INMAR 2280 L IND SEC 2'));
+    chunks.push(t('PUERTO MONTT'));
+    chunks.push(t('electromecanicajr.spa@gmail.com'));
     chunks.push(Buffer.from([ESC, 0x61, 0x00])); // Izquierda
     chunks.push(Buffer.from([LF]));
 
@@ -171,7 +259,7 @@ async function printViaCOM(datos: TicketDatos, comPort: string): Promise<void> {
     // Importación dinámica para evitar problemas de bundling de Next.js
     const { SerialPort } = await import('serialport') as any;
 
-    const buffer = buildEscPosBuffer(datos);
+    const buffer = await buildEscPosBuffer(datos);
 
     await new Promise<void>((resolve, reject) => {
         const port = new SerialPort({

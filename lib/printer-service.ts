@@ -1,22 +1,22 @@
 /**
- * printerService.ts
- * Servicio de impresión ESC/POS para impresora JP80H
- * 
+ * printer-service.ts
+ * Servicio de impresión ESC/POS para impresora JP80H via Bluetooth (COM port) en Windows.
+ *
  * Estrategia:
- * 1. Intenta imprimir por USB (automático, detecta el dispositivo)
- * 2. Si falla, intenta por puerto COM Bluetooth/Serie (configurado en PRINTER_COM_PORT)
- * 3. Si todo falla, lanza error descriptivo al cliente
- * 
- * Instalación: npm install escpos escpos-usb escpos-network
- * Para Bluetooth vía COM: npm install serialport (opcional)
+ * 1. Intenta por COM port usando serialport (Bluetooth emparejado en Windows)
+ * 2. Si falla COM3, intenta COM5 (el otro puerto del par Bluetooth)
+ * 3. Si todo falla, lanza error descriptivo
+ *
+ * Prerequisitos: npm install serialport escpos escpos-usb escpos-network
  */
 
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
-const COM_PORT = process.env.PRINTER_COM_PORT || 'COM3';  // Puerto COM Bluetooth (Windows)
-const CHARS_PER_LINE = 32;  // Caracteres por línea para JP80H en modo normal
-const BT_MAC = '86:67:7A:B9:0F:7F';  // MAC de la JP80H (referencia)
+const COM_PORT_PRIMARY = process.env.PRINTER_COM_PORT || 'COM3';
+const COM_PORT_SECONDARY = process.env.PRINTER_COM_PORT_2 || 'COM5';
+const BAUD_RATE = 9600;   // Velocidad estándar para impresoras Bluetooth
+const CHARS_PER_LINE = 32;
 
 // ============================================================
 // TIPOS
@@ -36,257 +36,231 @@ export interface TicketDatos {
     atendidoPor?: string | null;
 }
 
-export type PrintResult = { success: true; method: string; message: string } | { success: false; error: string; tip?: string };
+export type PrintResult =
+    | { success: true; method: string; message: string }
+    | { success: false; error: string; tip?: string; detail?: string };
 
 // ============================================================
-// HELPERS DE FORMATO
+// HELPERS DE FORMATO (texto puro, sin ESC/POS aún)
 // ============================================================
-
-/** Centra texto dentro del ancho del ticket */
 function center(text: string, width = CHARS_PER_LINE): string {
-    if (text.length >= width) return text;
+    if (text.length >= width) return text.substring(0, width);
     const pad = Math.floor((width - text.length) / 2);
     return ' '.repeat(pad) + text;
 }
 
-/** Alinea izquierda y derecha con puntos de relleno en el medio */
 function twoColumns(left: string, right: string, width = CHARS_PER_LINE): string {
     const maxLeft = width - right.length - 1;
-    const trimmedLeft = left.substring(0, maxLeft);
-    const dots = '.'.repeat(Math.max(1, width - trimmedLeft.length - right.length));
-    return trimmedLeft + dots + right;
+    const l = left.substring(0, maxLeft);
+    const dots = '.'.repeat(Math.max(1, width - l.length - right.length));
+    return l + dots + right;
 }
 
-/** Trunca/ajusta texto a max chars por línea */
 function wrap(text: string, width = CHARS_PER_LINE): string[] {
-    const lines: string[] = [];
-    const words = text.split('\n');
-    for (const word of words) {
-        if (word.length <= width) {
-            lines.push(word);
+    const result: string[] = [];
+    text.split('\n').forEach(line => {
+        if (line.length <= width) {
+            result.push(line);
         } else {
-            // Divide líneas largas
-            for (let i = 0; i < word.length; i += width) {
-                lines.push(word.substring(i, i + width));
+            for (let i = 0; i < line.length; i += width) {
+                result.push(line.substring(i, i + width));
             }
         }
-    }
-    return lines;
-}
-
-/** Línea divisoria */
-const DIVIDER_DASH = '-'.repeat(CHARS_PER_LINE);
-const DIVIDER_EQUAL = '='.repeat(CHARS_PER_LINE);
-
-// ============================================================
-// GENERADOR DE TEXTO DEL TICKET
-// ============================================================
-/** Genera el ticket como array de líneas de texto plano */
-function buildTicketLines(datos: TicketDatos): string[] {
-    const lines: string[] = [];
-    const fecha = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
-
-    // Encabezado
-    lines.push(center('ELECTROMECANICA JR'));
-    lines.push(center('Taller Mecanico'));
-    lines.push(DIVIDER_EQUAL);
-    lines.push('');
-
-    // Info básica
-    lines.push(`Ticket #: ${datos.ordenId}`);
-    lines.push(`Fecha: ${fecha}`);
-    lines.push(DIVIDER_DASH);
-
-    // Cliente y vehículo
-    if (datos.clienteNombre) lines.push(`Cliente: ${datos.clienteNombre}`);
-    if (datos.clienteTelefono) lines.push(`Tel: ${datos.clienteTelefono}`);
-    lines.push(`Patente: ${datos.patente}`);
-    if (datos.vehiculo) lines.push(`Vehiculo: ${datos.vehiculo}`);
-    if (datos.motor) lines.push(`Motor: ${datos.motor}`);
-    if (datos.kmIngreso) lines.push(`KM Entrada: ${datos.kmIngreso.toLocaleString('es-CL')}`);
-    if (datos.kmSalida) lines.push(`KM Salida:  ${datos.kmSalida.toLocaleString('es-CL')}`);
-    lines.push('');
-    lines.push(DIVIDER_DASH);
-
-    // Servicios
-    lines.push(center('- SERVICIOS -'));
-    lines.push('');
-    if (datos.descripcion) {
-        const serviceLines = datos.descripcion.split('\n').filter(l => l.trim());
-        for (const sLine of serviceLines) {
-            wrap(sLine).forEach(l => lines.push(l));
-        }
-    }
-    lines.push('');
-    lines.push(DIVIDER_DASH);
-
-    // Total y métodos de pago
-    if (datos.precioTotal !== undefined && datos.precioTotal !== null) {
-        const totalStr = `$${datos.precioTotal.toLocaleString('es-CL')}`;
-        lines.push(twoColumns('TOTAL:', totalStr));
-    }
-    if (datos.metodosPago && datos.metodosPago.length > 0) {
-        for (const mp of datos.metodosPago) {
-            lines.push(twoColumns(`  ${mp.metodo.toUpperCase()}:`, `$${mp.monto.toLocaleString('es-CL')}`));
-        }
-    }
-    lines.push('');
-    lines.push(DIVIDER_EQUAL);
-
-    // Pie
-    lines.push('');
-    lines.push(center('*** GRACIAS POR SU PREFERENCIA ***'));
-    if (datos.atendidoPor) {
-        lines.push(center(`Atendido por: ${datos.atendidoPor}`));
-    }
-    lines.push('');
-    lines.push('');
-
-    return lines;
-}
-
-// ============================================================
-// MÉTODO 1: IMPRESIÓN VÍA escpos + USB
-// ============================================================
-async function printViaEscposUSB(datos: TicketDatos): Promise<void> {
-    // Importación dinámica para evitar problemas de bundling en Next.js
-    const escpos = await import('escpos').then(m => m.default || m) as any;
-    const USB = await import('escpos-usb').then(m => m.default || m) as any;
-
-    const devices = USB.findPrinter ? USB.findPrinter() : USB.FindPrinter?.();
-    if (!devices || devices.length === 0) {
-        throw new Error('No se encontró ninguna impresora USB. Verifica la conexión.');
-    }
-
-    const device = new USB();
-    const printer = new escpos.Printer(device, { encoding: 'PC437' });
-    const lines = buildTicketLines(datos);
-
-    await new Promise<void>((resolve, reject) => {
-        device.open((err: any) => {
-            if (err) return reject(err);
-
-            try {
-                printer
-                    .encode('PC437')
-                    .align('CT');
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    // Primera línea (encabezado): negrita + grande
-                    if (i === 0) {
-                        printer.style('B').size(1, 1).text(line).style('NORMAL').size(0, 0);
-                    } else {
-                        printer.align('LT').text(line);
-                    }
-                }
-
-                printer.cut().close((closeErr: any) => {
-                    if (closeErr) reject(closeErr);
-                    else resolve();
-                });
-            } catch (printErr) {
-                reject(printErr);
-            }
-        });
     });
+    return result;
 }
 
-// ============================================================
-// MÉTODO 2: IMPRESIÓN VÍA COM PORT (Bluetooth/USB-Serie en Windows)
-// ============================================================
-async function printViaCOMPort(datos: TicketDatos, comPort: string): Promise<void> {
-    const fs = await import('fs');
-    const lines = buildTicketLines(datos);
+const DIVIDER = '-'.repeat(CHARS_PER_LINE);
+const DIVIDER2 = '='.repeat(CHARS_PER_LINE);
 
-    // Comandos ESC/POS crudos
+// ============================================================
+// BUILDER DE BUFFER ESC/POS
+// ============================================================
+function buildEscPosBuffer(datos: TicketDatos): Buffer {
     const ESC = 0x1b;
     const GS = 0x1d;
+    const LF = 0x0a;
+
     const chunks: Buffer[] = [];
+    const t = (s: string) => Buffer.from(s + '\n', 'ascii');
 
-    // Init + Encoding PC437
-    chunks.push(Buffer.from([ESC, 0x40]));          // Init
-    chunks.push(Buffer.from([ESC, 0x74, 0x00]));    // PC437
-    chunks.push(Buffer.from([ESC, 0x61, 0x01]));    // Align center
+    // Init + PC437
+    chunks.push(Buffer.from([ESC, 0x40]));       // Init
+    chunks.push(Buffer.from([ESC, 0x74, 0x00])); // PC437 encoding
+    chunks.push(Buffer.from([ESC, 0x61, 0x01])); // Centrar
 
-    // Primera línea (encabezado) en negrita y doble alto
-    chunks.push(Buffer.from([ESC, 0x45, 0x01]));    // Bold ON
-    chunks.push(Buffer.from([ESC, 0x21, 0x10]));    // Double height
-    chunks.push(Buffer.from(lines[0] + '\n', 'ascii'));
-    chunks.push(Buffer.from([ESC, 0x21, 0x00]));    // Normal size
-    chunks.push(Buffer.from([ESC, 0x45, 0x00]));    // Bold OFF
-    chunks.push(Buffer.from([ESC, 0x61, 0x00]));    // Align left
+    // Encabezado en negrita + doble alto
+    chunks.push(Buffer.from([ESC, 0x45, 0x01])); // Bold ON
+    chunks.push(Buffer.from([ESC, 0x21, 0x10])); // Doble alto
+    chunks.push(t('ELECTROMECANICA JR'));
+    chunks.push(Buffer.from([ESC, 0x21, 0x00])); // Normal size
+    chunks.push(Buffer.from([ESC, 0x45, 0x00])); // Bold OFF
+    chunks.push(t('Taller Mecanico'));
+    chunks.push(Buffer.from([ESC, 0x61, 0x00])); // Izquierda
+    chunks.push(Buffer.from([LF]));
 
-    // Resto del ticket
-    for (let i = 1; i < lines.length; i++) {
-        chunks.push(Buffer.from(lines[i] + '\n', 'ascii'));
+    // Info básica
+    const fecha = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+    chunks.push(t(DIVIDER2));
+    chunks.push(t(`Ticket #: ${datos.ordenId}`));
+    chunks.push(t(`Fecha: ${fecha}`));
+    chunks.push(t(DIVIDER));
+
+    // Cliente y vehículo
+    if (datos.clienteNombre) chunks.push(t(`Cliente: ${datos.clienteNombre}`));
+    if (datos.clienteTelefono) chunks.push(t(`Tel: ${datos.clienteTelefono}`));
+    chunks.push(t(`Patente: ${datos.patente}`));
+    if (datos.vehiculo) chunks.push(t(`Vehiculo: ${datos.vehiculo}`));
+    if (datos.motor) chunks.push(t(`Motor: ${datos.motor}`));
+    if (datos.kmIngreso) chunks.push(t(`KM Entrada: ${datos.kmIngreso.toLocaleString('es-CL')}`));
+    if (datos.kmSalida) chunks.push(t(`KM Salida:  ${datos.kmSalida.toLocaleString('es-CL')}`));
+    chunks.push(Buffer.from([LF]));
+    chunks.push(t(DIVIDER));
+
+    // Servicios
+    chunks.push(Buffer.from([ESC, 0x61, 0x01])); // Centrar
+    chunks.push(Buffer.from([ESC, 0x45, 0x01])); // Bold ON
+    chunks.push(t('- SERVICIOS -'));
+    chunks.push(Buffer.from([ESC, 0x45, 0x00])); // Bold OFF
+    chunks.push(Buffer.from([ESC, 0x61, 0x00])); // Izquierda
+    chunks.push(Buffer.from([LF]));
+
+    if (datos.descripcion) {
+        datos.descripcion.split('\n')
+            .filter(l => l.trim())
+            .flatMap(l => wrap(l))
+            .forEach(l => chunks.push(t(l)));
     }
 
-    // Feed + Corte
-    chunks.push(Buffer.from([0x0a, 0x0a, 0x0a]));   // 3 saltos
+    chunks.push(Buffer.from([LF]));
+    chunks.push(t(DIVIDER));
+
+    // Total
+    if (datos.precioTotal !== undefined && datos.precioTotal !== null) {
+        chunks.push(Buffer.from([ESC, 0x45, 0x01]));
+        chunks.push(t(twoColumns('TOTAL:', `$${datos.precioTotal.toLocaleString('es-CL')}`)));
+        chunks.push(Buffer.from([ESC, 0x45, 0x00]));
+    }
+    if (datos.metodosPago?.length) {
+        datos.metodosPago.forEach(mp =>
+            chunks.push(t(twoColumns(`  ${mp.metodo.toUpperCase()}:`, `$${mp.monto.toLocaleString('es-CL')}`)))
+        );
+    }
+
+    chunks.push(Buffer.from([LF]));
+    chunks.push(t(DIVIDER2));
+
+    // Pie de página
+    chunks.push(Buffer.from([ESC, 0x61, 0x01])); // Centrar
+    chunks.push(t('*** GRACIAS POR SU PREFERENCIA ***'));
+    if (datos.atendidoPor) {
+        chunks.push(t(`Atendido por: ${datos.atendidoPor}`));
+    }
+
+    // Avance y corte
+    chunks.push(Buffer.from([LF, LF, LF]));
     chunks.push(Buffer.from([GS, 0x56, 0x42, 0x05])); // Cortar papel
 
-    const ticketBuffer = Buffer.concat(chunks);
+    return Buffer.concat(chunks);
+}
 
-    // En Windows, puertos COM > COM9 necesitan prefijo \\\\.\\
-    const portPath = /^COM\d+$/i.test(comPort.trim()) ? `\\\\.\\${comPort.trim()}` : comPort;
+// ============================================================
+// IMPRIMIR VÍA SERIALPORT (más confiable que fs.writeFile en Windows)
+// ============================================================
+async function printViaCOM(datos: TicketDatos, comPort: string): Promise<void> {
+    // Importación dinámica para evitar problemas de bundling de Next.js
+    const { SerialPort } = await import('serialport') as any;
+
+    const buffer = buildEscPosBuffer(datos);
 
     await new Promise<void>((resolve, reject) => {
-        fs.writeFile(portPath, ticketBuffer, (err) => {
-            if (err) reject(err);
-            else resolve();
+        const port = new SerialPort({
+            path: comPort,
+            baudRate: BAUD_RATE,
+            autoOpen: false,
+        });
+
+        port.open((openErr: Error | null) => {
+            if (openErr) {
+                return reject(new Error(`No se pudo abrir ${comPort}: ${openErr.message}`));
+            }
+
+            port.write(buffer, (writeErr: Error | null) => {
+                if (writeErr) {
+                    port.close(() => { });
+                    return reject(new Error(`Error escribiendo en ${comPort}: ${writeErr.message}`));
+                }
+
+                port.drain((drainErr: Error | null) => {
+                    port.close((closeErr: Error | null) => {
+                        if (drainErr || closeErr) {
+                            // Imprimió pero hubo error al cerrar — lo consideramos éxito
+                            console.warn('Advertencia al cerrar puerto:', drainErr || closeErr);
+                        }
+                        resolve();
+                    });
+                });
+            });
+        });
+
+        port.on('error', (err: Error) => {
+            reject(new Error(`Error de puerto serial ${comPort}: ${err.message}`));
         });
     });
 }
 
 // ============================================================
-// FUNCIÓN PRINCIPAL: Intenta USB → COM Bluetooth
+// FUNCIÓN PRINCIPAL: COM3 → COM5
 // ============================================================
 export async function imprimirTicket(datos: TicketDatos): Promise<PrintResult> {
-    const errors: string[] = [];
+    const errors: Record<string, string> = {};
 
-    // --- INTENTO 1: USB via escpos-usb ---
+    // --- INTENTO 1: Puerto COM principal (ej: COM3) ---
     try {
-        console.log('🖨️  Intentando imprimir por USB...');
-        await printViaEscposUSB(datos);
-        console.log('✅ Impresión USB exitosa');
+        console.log(`🖨️  Intentando imprimir en ${COM_PORT_PRIMARY}...`);
+        await printViaCOM(datos, COM_PORT_PRIMARY);
+        console.log(`✅ Impresión exitosa en ${COM_PORT_PRIMARY}`);
         return {
             success: true,
-            method: 'USB',
-            message: `Ticket #${datos.ordenId} impreso por USB ✓`
+            method: COM_PORT_PRIMARY,
+            message: `¡Ticket #${datos.ordenId} enviado a la impresora (${COM_PORT_PRIMARY})! ✓`,
         };
-    } catch (usbError: any) {
-        const msg = usbError?.message || String(usbError);
-        console.warn('⚠️  USB falló:', msg);
-        errors.push(`USB: ${msg}`);
+    } catch (e: any) {
+        const msg = e?.message || String(e);
+        console.warn(`⚠️  ${COM_PORT_PRIMARY} falló:`, msg);
+        errors[COM_PORT_PRIMARY] = msg;
     }
 
-    // --- INTENTO 2: Puerto COM (Bluetooth emparejado o USB-Serie) ---
-    try {
-        console.log(`🖨️  Intentando imprimir por COM (${COM_PORT})...`);
-        await printViaCOMPort(datos, COM_PORT);
-        console.log(`✅ Impresión vía ${COM_PORT} exitosa`);
-        return {
-            success: true,
-            method: `COM (${COM_PORT})`,
-            message: `Ticket #${datos.ordenId} impreso por ${COM_PORT} (Bluetooth) ✓`
-        };
-    } catch (comError: any) {
-        const msg = comError?.message || String(comError);
-        console.error('❌ COM falló:', msg);
-        errors.push(`${COM_PORT}: ${msg}`);
+    // --- INTENTO 2: Puerto COM secundario (ej: COM5) ---
+    if (COM_PORT_SECONDARY !== COM_PORT_PRIMARY) {
+        try {
+            console.log(`🖨️  Intentando imprimir en ${COM_PORT_SECONDARY}...`);
+            await printViaCOM(datos, COM_PORT_SECONDARY);
+            console.log(`✅ Impresión exitosa en ${COM_PORT_SECONDARY}`);
+            return {
+                success: true,
+                method: COM_PORT_SECONDARY,
+                message: `¡Ticket #${datos.ordenId} enviado a la impresora (${COM_PORT_SECONDARY})! ✓`,
+            };
+        } catch (e: any) {
+            const msg = e?.message || String(e);
+            console.error(`❌ ${COM_PORT_SECONDARY} también falló:`, msg);
+            errors[COM_PORT_SECONDARY] = msg;
+        }
     }
 
     // --- AMBOS FALLARON ---
+    const errorDetails = Object.entries(errors).map(([p, m]) => `${p}: ${m}`).join(' | ');
     return {
         success: false,
-        error: 'No se pudo conectar a la impresora.',
+        error: `No se pudo conectar a la impresora. Verifica que la JP80H esté encendida y emparejada por Bluetooth.`,
+        detail: errorDetails,
         tip: [
-            'Verifica que la JP80H esté encendida.',
-            'Por USB: conecta el cable USB y confirma que Windows la detecta.',
-            `Por Bluetooth: empareja la impresora y configura PRINTER_COM_PORT=${COM_PORT} en tu .env.local`,
-            'Para ver el puerto COM: Administrador de dispositivos → Puertos (COM y LPT)',
-            `Errores detallados: ${errors.join(' | ')}`
+            `1. Enciende la impresora JP80H`,
+            `2. Conecta por Bluetooth si aún no está emparejada`,
+            `3. En el .env verifica: PRINTER_COM_PORT=${COM_PORT_PRIMARY}`,
+            `4. Si sigue fallando, prueba PRINTER_COM_PORT=${COM_PORT_SECONDARY}`,
+            `5. Errores técnicos: ${errorDetails}`,
         ].join('\n'),
     };
 }

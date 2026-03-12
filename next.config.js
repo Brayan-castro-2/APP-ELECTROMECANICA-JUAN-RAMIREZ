@@ -8,7 +8,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
     // Impide que Next.js empaquete módulos nativos de impresión (requieren compilación C++)
-    serverExternalPackages: ['escpos', 'escpos-usb', 'escpos-network', 'usb', '@serialport/bindings-cpp'],
+    serverComponentsExternalPackages: ['escpos', 'escpos-usb', 'escpos-network', 'usb', 'serialport', '@serialport/bindings-cpp'],
   },
 
   images: {

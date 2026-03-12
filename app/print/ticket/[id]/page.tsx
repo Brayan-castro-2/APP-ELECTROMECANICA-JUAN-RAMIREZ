@@ -64,9 +64,9 @@ export default function TicketPage() {
     };
 
     // ============================================================
-    // Imprimir en JP80H via QZ Tray (funciona desde Vercel/producción)
-    // QZ Tray es una app de escritorio que corre en la PC del taller.
-    // El navegador se conecta a ella via WebSocket local.
+    // Imprimir en JP80H via ESC/POS
+    // - En localhost: usa la API route (serialport + PowerShell — funciona directo)
+    // - En producción (Vercel): usa QZ Tray via WebSocket local
     // ============================================================
     const handleBluetoothPrint = async () => {
         if (!orden) return;
@@ -74,42 +74,58 @@ export default function TicketPage() {
         setBtStatus('idle');
         setBtMessage('');
 
+        const datos = {
+            ordenId: orden.id,
+            clienteNombre: orden.cliente_nombre,
+            clienteTelefono: orden.cliente_telefono,
+            patente: orden.patente_vehiculo,
+            vehiculo: vehiculo ? `${vehiculo.marca} ${vehiculo.modelo} ${vehiculo.anio || ''}`.trim() : null,
+            motor: vehiculo?.motor || null,
+            kmIngreso: (orden as any).kilometraje || null,
+            kmSalida: (orden as any).kilometraje_salida || null,
+            descripcion: orden.descripcion_ingreso,
+            precioTotal: orden.precio_total,
+            metodosPago: (orden as any).metodos_pago || null,
+            atendidoPor: mecanico?.nombre_completo?.split(' ')[0] || null,
+        };
+
+        const isLocalhost = typeof window !== 'undefined' &&
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
         try {
-            const { imprimirConQZ } = await import('@/lib/qz-print');
+            if (isLocalhost) {
+                // ── LOCALHOST: usar API route con serialport / PowerShell ──
+                const res = await fetch('/api/print/ticket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos),
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    setBtStatus('success');
+                    setBtMessage(result.message || '¡Ticket enviado a la impresora!');
+                } else {
+                    throw new Error(result.error + (result.detail ? `\n${result.detail}` : ''));
+                }
 
-            const datos = {
-                ordenId: orden.id,
-                clienteNombre: orden.cliente_nombre,
-                clienteTelefono: orden.cliente_telefono,
-                patente: orden.patente_vehiculo,
-                vehiculo: vehiculo ? `${vehiculo.marca} ${vehiculo.modelo} ${vehiculo.anio || ''}`.trim() : null,
-                motor: vehiculo?.motor || null,
-                kmIngreso: (orden as any).kilometraje || null,
-                kmSalida: (orden as any).kilometraje_salida || null,
-                descripcion: orden.descripcion_ingreso,
-                precioTotal: orden.precio_total,
-                metodosPago: (orden as any).metodos_pago || null,
-                atendidoPor: mecanico?.nombre_completo?.split(' ')[0] || null,
-            };
-
-            // El nombre de la impresora en Windows — se puede configurar en .env si es diferente
-            const printerName = process.env.NEXT_PUBLIC_PRINTER_NAME || 'JP80H';
-            await imprimirConQZ(datos, printerName);
-
-            setBtStatus('success');
-            setBtMessage(`¡Ticket #${orden.id} enviado a la impresora! ✓`);
+            } else {
+                // ── PRODUCCIÓN: usar QZ Tray (app local en la PC del taller) ──
+                const { imprimirConQZ } = await import('@/lib/qz-print');
+                const printerName = process.env.NEXT_PUBLIC_PRINTER_NAME || 'JP80H';
+                await imprimirConQZ(datos, printerName);
+                setBtStatus('success');
+                setBtMessage(`¡Ticket #${orden.id} enviado a la impresora! ✓`);
+            }
 
         } catch (err: any) {
             setBtStatus('error');
             const msg = err?.message || String(err);
-
-            // Mensaje amigable según el tipo de error
-            if (msg.includes('Unable to establish') || msg.includes('ECONNREFUSED') || msg.includes('connect')) {
-                setBtMessage('QZ Tray no está corriendo. Descarga e instala QZ Tray en la PC del taller (qz.io), luego vuelve a intentar.');
+            if (msg.includes('Unable to establish') || msg.includes('ECONNREFUSED') || msg.includes('WebSocket')) {
+                setBtMessage('QZ Tray no está corriendo. Instala QZ Tray en la PC del taller (qz.io) y vuelve a intentar.');
             } else if (msg.includes('not found') || msg.includes('No matching')) {
-                setBtMessage(`Impresora "JP80H" no encontrada en QZ Tray. Verifica que esté instalada en Windows.`);
+                setBtMessage('Impresora "JP80H" no encontrada. Verifica el nombre en NEXT_PUBLIC_PRINTER_NAME.');
             } else {
-                setBtMessage(`Error: ${msg}`);
+                setBtMessage(msg);
             }
         } finally {
             setIsBtPrinting(false);

@@ -87,7 +87,13 @@ const DIVIDER2 = '='.repeat(CHARS_PER_LINE);
  */
 async function buildLogoBuffer(): Promise<Buffer | null> {
     try {
-        const Jimp = await import('jimp') as any;
+        // jimp v1.x usa exports con nombre, no default
+        const jimpModule = await import('jimp') as any;
+        // La clase Jimp puede estar como Jimp, default, o directamente en el módulo
+        const Jimp = jimpModule.Jimp || jimpModule.default || jimpModule;
+        if (!Jimp || typeof Jimp.read !== 'function') {
+            throw new Error('jimp no disponible o API incompatible');
+        }
         const img = await Jimp.read(LOGO_PATH);
 
         // Escalar manteniendo proporción

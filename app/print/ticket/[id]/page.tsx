@@ -99,15 +99,18 @@ export default function TicketPage() {
                 setBtMessage(result.message || '¡Ticket enviado a la impresora!');
             } else {
                 setBtStatus('error');
-                setBtMessage(result.error || 'Error al imprimir');
+                // Mostrar error principal + detalle técnico (qué puerto falló) para diagnóstico
+                const errorMsg = result.error || 'Error al imprimir';
+                const detail = result.detail ? `\n📋 ${result.detail}` : '';
+                setBtMessage(errorMsg + detail);
             }
         } catch (err: any) {
             setBtStatus('error');
             setBtMessage('Error de red: ' + (err.message || 'No se pudo conectar al servidor'));
         } finally {
             setIsBtPrinting(false);
-            // Auto-resetear el mensaje después de 5 segundos
-            setTimeout(() => setBtStatus('idle'), 5000);
+            // Auto-resetear el mensaje después de 10 segundos (más tiempo para leer el error)
+            setTimeout(() => setBtStatus('idle'), 10000);
         }
     };
 

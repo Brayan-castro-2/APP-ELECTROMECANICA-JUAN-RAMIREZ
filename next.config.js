@@ -4,9 +4,11 @@ const nextConfig = {
   swcMinify: true,
   compress: true,
   poweredByHeader: false,
-  
+
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    // Impide que Next.js empaquete módulos nativos de impresión (requieren compilación C++)
+    serverExternalPackages: ['escpos', 'escpos-usb', 'escpos-network', 'usb', '@serialport/bindings-cpp'],
   },
 
   images: {

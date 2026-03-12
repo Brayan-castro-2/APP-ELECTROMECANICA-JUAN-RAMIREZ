@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { obtenerOrdenPorId, buscarVehiculoPorPatente, obtenerPerfilPorId, type OrdenDB, type VehiculoDB, type PerfilDB } from '@/lib/storage-adapter';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, MessageCircle, Printer } from 'lucide-react';
+import { Download, Loader2, MessageCircle, Printer, Bluetooth, CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
 
 export default function TicketPage() {
@@ -19,6 +19,9 @@ export default function TicketPage() {
     const [vehiculo, setVehiculo] = useState<VehiculoDB | null>(null);
     const [mecanico, setMecanico] = useState<PerfilDB | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isBtPrinting, setIsBtPrinting] = useState(false);
+    const [btStatus, setBtStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [btMessage, setBtMessage] = useState('');
 
     const ticketRef = useRef<HTMLDivElement | null>(null);
 
@@ -40,11 +43,11 @@ export default function TicketPage() {
 
             if (ordenData) {
                 setOrden(ordenData);
-                
+
                 // Buscar vehículo completo desde Supabase por patente
                 const veh = await buscarVehiculoPorPatente(ordenData.patente_vehiculo);
                 setVehiculo(veh);
-                
+
                 // Buscar mecánico asignado
                 if (ordenData.asignado_a) {
                     const mec = await obtenerPerfilPorId(ordenData.asignado_a);
@@ -58,6 +61,54 @@ export default function TicketPage() {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    // Imprimir en impresora térmica Bluetooth (JP80H) via ESC/POS
+    const handleBluetoothPrint = async () => {
+        if (!orden) return;
+        setIsBtPrinting(true);
+        setBtStatus('idle');
+        setBtMessage('');
+
+        try {
+            const payload = {
+                ordenId: orden.id,
+                clienteNombre: orden.cliente_nombre,
+                clienteTelefono: orden.cliente_telefono,
+                patente: orden.patente_vehiculo,
+                vehiculo: vehiculo ? `${vehiculo.marca} ${vehiculo.modelo} ${vehiculo.anio || ''}`.trim() : null,
+                motor: vehiculo?.motor || null,
+                kmIngreso: (orden as any).kilometraje || null,
+                kmSalida: (orden as any).kilometraje_salida || null,
+                descripcion: orden.descripcion_ingreso,
+                precioTotal: orden.precio_total,
+                metodosPago: (orden as any).metodos_pago || null,
+                atendidoPor: mecanico?.nombre_completo?.split(' ')[0] || null,
+            };
+
+            const res = await fetch('/api/print/ticket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await res.json();
+
+            if (res.ok && result.success) {
+                setBtStatus('success');
+                setBtMessage(result.message || '¡Ticket enviado a la impresora!');
+            } else {
+                setBtStatus('error');
+                setBtMessage(result.error || 'Error al imprimir');
+            }
+        } catch (err: any) {
+            setBtStatus('error');
+            setBtMessage('Error de red: ' + (err.message || 'No se pudo conectar al servidor'));
+        } finally {
+            setIsBtPrinting(false);
+            // Auto-resetear el mensaje después de 5 segundos
+            setTimeout(() => setBtStatus('idle'), 5000);
+        }
     };
 
     const handleDownloadPdf = async () => {
@@ -88,12 +139,12 @@ export default function TicketPage() {
 
     const handleWhatsApp = () => {
         if (!orden) return;
-        
+
         const total = orden.precio_total ? `$${orden.precio_total.toLocaleString('es-CL')}` : 'Por definir';
         const vehiculoStr = vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : orden.patente_vehiculo;
-        
+
         const text = `Hola ${orden.cliente_nombre || 'Cliente'},\n\nSu vehículo *${vehiculoStr}* (Patente: ${orden.patente_vehiculo}) está listo.\n\n*Total a pagar: ${total}*\n\nDetalle servicios:\n${orden.descripcion_ingreso}\n\nGracias por preferir Electromecánica JR.`;
-        
+
         const url = `https://wa.me/${orden.cliente_telefono?.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
         window.open(url, '_blank');
     };
@@ -125,20 +176,49 @@ export default function TicketPage() {
     return (
         <div className="min-h-screen bg-gray-100 py-8 flex flex-col items-center">
             {/* Action Buttons - Hidden when printing */}
-            <div className="print:hidden flex gap-4 mb-8 fixed bottom-4 z-50">
-                <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white rounded-full shadow-lg px-6">
+            <div className="print:hidden flex flex-wrap gap-3 mb-8 fixed bottom-4 left-0 right-0 justify-center z-50 px-4">
+                {/* Bluetooth Print - Principal */}
+                <Button
+                    onClick={handleBluetoothPrint}
+                    disabled={isBtPrinting}
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg px-5 text-sm"
+                >
+                    {isBtPrinting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : btStatus === 'success' ? (
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                    ) : btStatus === 'error' ? (
+                        <XCircle className="w-4 h-4 mr-2" />
+                    ) : (
+                        <Bluetooth className="w-4 h-4 mr-2" />
+                    )}
+                    {isBtPrinting ? 'Imprimiendo...' : btStatus === 'success' ? '¡Impreso!' : btStatus === 'error' ? 'Reintentar' : 'Imprimir JP80H'}
+                </Button>
+                <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white rounded-full shadow-lg px-5 text-sm">
                     <Printer className="w-4 h-4 mr-2" />
-                    Imprimir Ticket
+                    Imprimir
                 </Button>
-                <Button onClick={handleDownloadPdf} className="bg-white hover:bg-gray-50 text-black rounded-full shadow-lg px-6 border border-gray-300">
+                <Button onClick={handleDownloadPdf} className="bg-white hover:bg-gray-50 text-black rounded-full shadow-lg px-5 border border-gray-300 text-sm">
                     <Download className="w-4 h-4 mr-2" />
-                    Descargar PDF
+                    PDF
                 </Button>
-                <Button onClick={handleWhatsApp} className="bg-[#25D366] hover:bg-[#128C7E] text-white rounded-full shadow-lg px-6">
+                <Button onClick={handleWhatsApp} className="bg-[#25D366] hover:bg-[#128C7E] text-white rounded-full shadow-lg px-5 text-sm">
                     <MessageCircle className="w-4 h-4 mr-2" />
-                    Enviar WhatsApp
+                    WhatsApp
                 </Button>
             </div>
+
+            {/* Feedback Bluetooth */}
+            {btStatus !== 'idle' && (
+                <div className={`print:hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 ${btStatus === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
+                    {btStatus === 'success'
+                        ? <CheckCircle className="w-4 h-4" />
+                        : <XCircle className="w-4 h-4" />
+                    }
+                    {btMessage}
+                </div>
+            )}
 
             {/* Ticket Container */}
             <div ref={ticketRef} className="bg-white text-black w-[320px] p-4 shadow-xl print:shadow-none print:w-full print:p-0 font-mono text-sm leading-tight ticket-container">
@@ -166,16 +246,16 @@ export default function TicketPage() {
                     <div className="grid grid-cols-[80px_1fr] gap-1">
                         <span className="font-bold">Cliente:</span>
                         <span className="uppercase truncate">{orden.cliente_nombre || 'S/N'}</span>
-                        
+
                         <span className="font-bold">Teléfono:</span>
                         <span>{orden.cliente_telefono || 'S/N'}</span>
-                        
+
                         <span className="font-bold">Patente:</span>
                         <span className="font-bold uppercase">{orden.patente_vehiculo}</span>
-                        
+
                         <span className="font-bold">Vehículo:</span>
                         <span className="uppercase">{vehiculo ? `${vehiculo.marca} ${vehiculo.modelo} ${vehiculo.anio || ''}` : 'Por definir'}</span>
-                        
+
                         {vehiculo?.motor && (
                             <>
                                 <span className="font-bold">Motor:</span>

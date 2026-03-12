@@ -10,8 +10,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, WifiOff } from 'lucide-react';
+import { LogOut, WifiOff, Menu } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { openMobileDrawer } from '@/components/layout/sidebar';
 
 export function Header() {
     const { user, logout } = useAuth();
@@ -24,24 +25,24 @@ export function Header() {
             // Verificar si hay logs de modo offline en la consola
             const originalLog = console.log;
             const originalWarn = console.warn;
-            
-            console.log = function(...args) {
+
+            console.log = function (...args) {
                 if (args[0]?.includes?.('OFFLINE') || args[0]?.includes?.('offline')) {
                     setIsOffline(true);
                 }
                 originalLog.apply(console, args);
             };
-            
-            console.warn = function(...args) {
+
+            console.warn = function (...args) {
                 if (args[0]?.includes?.('OFFLINE') || args[0]?.includes?.('offline')) {
                     setIsOffline(true);
                 }
                 originalWarn.apply(console, args);
             };
         };
-        
+
         checkOfflineMode();
-        
+
         // También verificar periódicamente
         const interval = setInterval(() => {
             // Si hay errores de red, activar modo offline
@@ -49,7 +50,7 @@ export function Header() {
                 setIsOffline(true);
             }
         }, 5000);
-        
+
         return () => clearInterval(interval);
     }, []);
 
@@ -69,9 +70,20 @@ export function Header() {
 
     return (
         <header className="sticky top-0 z-50 h-20 bg-[#0a0a0a] border-b border-[#333333] shadow-lg shadow-black/50">
-            <div className="h-full px-6 flex items-center justify-between max-w-7xl mx-auto">
-                {/* Logo Electromecánica JR */}
-                <div className="flex items-center gap-4">
+            <div className="h-full px-4 md:px-6 flex items-center justify-between max-w-7xl mx-auto gap-3">
+                {/* Left side: Hamburger (mobile) + Logo */}
+                <div className="flex items-center gap-3">
+                    {/* Botón hamburguesa - solo móvil */}
+                    {user && (
+                        <button
+                            onClick={openMobileDrawer}
+                            className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl bg-[#1a1a1a] hover:bg-[#242424] border border-[#333333] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0066FF]/50 active:scale-95"
+                            aria-label="Abrir menú"
+                        >
+                            <Menu className="w-5 h-5 text-white" />
+                        </button>
+                    )}
+
                     {/* Indicador de modo offline */}
                     {isOffline && (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">

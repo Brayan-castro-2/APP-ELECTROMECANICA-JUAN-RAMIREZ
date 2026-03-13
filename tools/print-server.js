@@ -58,92 +58,108 @@ function wrapLine(text) {
     return result;
 }
 
+// Limpia texto para que solo tenga caracteres ASCII (impresora PC437)
+function sanitize(str) {
+    return String(str)
+        .replace(/ñ/g, 'n').replace(/Ñ/g, 'N')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\x00-\x7F]/g, '');
+}
+
+function formatNumber(num) {
+    return String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 function buildEscPos(datos) {
-    const parts = [];
-    const n = s => s + '\n';
-    const ESC = '\x1B', GS = '\x1D';
+    // Usamos array de Buffers para no corromper datos binarios (logo)
+    const buffers = [];
+    const addText = (s) => buffers.push(Buffer.from(sanitize(s), 'ascii'));
+    const addLine = (s) => addText(s + '\n');
+    const addCmd = (bytes) => buffers.push(Buffer.from(bytes));
+
     const D = '-'.repeat(CHARS);
     const D2 = '='.repeat(CHARS);
-    const fecha = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+    const now = new Date();
+    const fecha = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-    parts.push(ESC + '@');           // Init
-    parts.push(ESC + '\x74\x00');   // PC437
+    addCmd([0x1B, 0x40]);          // Init
+    addCmd([0x1B, 0x74, 0x00]);    // PC437
 
-    // Logo (si está cargado)
+    // Logo (binario directo, NO pasa por sanitize)
     if (cachedLogoBuffer) {
-        parts.push(ESC + '\x61\x01');   // Centrar logo
-        parts.push(cachedLogoBuffer);
-        parts.push('\n');
+        addCmd([0x1B, 0x61, 0x01]);  // Centrar
+        buffers.push(cachedLogoBuffer);
+        addText('\n');
     }
 
     // Encabezado
-    parts.push(ESC + '\x61\x01');   // Centrar
-    parts.push(ESC + '\x45\x01');   // Bold
-    parts.push(ESC + '\x21\x10');   // Doble alto
-    parts.push(n('ELECTROMECANICA JR. SPA'));
-    parts.push(ESC + '\x21\x00');
-    parts.push(ESC + '\x45\x00');
-    parts.push(n('SERVICIO DE MECANICA,'));
-    parts.push(n('ELECTRONICA AUTOMOTRIZ Y GRUAS'));
-    parts.push(n('A INMAR 2280 L IND SEC 2'));
-    parts.push(n('PUERTO MONTT'));
-    parts.push(n('electromecanicajr.spa@gmail.com'));
-    parts.push(ESC + '\x61\x00');
-    parts.push('\n');
+    addCmd([0x1B, 0x61, 0x01]);    // Centrar
+    addCmd([0x1B, 0x45, 0x01]);    // Bold
+    addCmd([0x1B, 0x21, 0x10]);    // Doble alto
+    addLine('ELECTROMECANICA JR. SPA');
+    addCmd([0x1B, 0x21, 0x00]);
+    addCmd([0x1B, 0x45, 0x00]);
+    addLine('SERVICIO DE MECANICA,');
+    addLine('ELECTRONICA AUTOMOTRIZ Y GRUAS');
+    addLine('A INMAR 2280 L IND SEC 2');
+    addLine('PUERTO MONTT');
+    addLine('electromecanicajr.spa@gmail.com');
+    addCmd([0x1B, 0x61, 0x00]);    // Izquierda
+    addText('\n');
 
     // Info ticket
-    parts.push(n(D2));
-    parts.push(n(`Ticket #: ${datos.ordenId}`));
-    parts.push(n(`Fecha:    ${fecha}`));
-    parts.push(n(D));
+    addLine(D2);
+    addLine(`Ticket #: ${datos.ordenId}`);
+    addLine(`Fecha:    ${fecha}`);
+    addLine(D);
 
-    // Cliente / vehículo
-    if (datos.clienteNombre) parts.push(n(`Cliente: ${datos.clienteNombre}`));
-    if (datos.clienteTelefono) parts.push(n(`Tel:     ${datos.clienteTelefono}`));
-    parts.push(n(`Patente: ${datos.patente}`));
-    if (datos.vehiculo) parts.push(n(`Vehiculo: ${datos.vehiculo}`));
-    if (datos.motor) parts.push(n(`Motor:    ${datos.motor}`));
-    if (datos.kmIngreso) parts.push(n(`KM Entrada: ${datos.kmIngreso.toLocaleString('es-CL')}`));
-    if (datos.kmSalida) parts.push(n(`KM Salida:  ${datos.kmSalida.toLocaleString('es-CL')}`));
-    parts.push('\n');
-    parts.push(n(D));
+    // Cliente / vehiculo
+    if (datos.clienteNombre) addLine(`Cliente: ${datos.clienteNombre}`);
+    if (datos.clienteTelefono) addLine(`Tel:     ${datos.clienteTelefono}`);
+    addLine(`Patente: ${datos.patente}`);
+    if (datos.vehiculo) addLine(`Vehiculo: ${datos.vehiculo}`);
+    if (datos.motor) addLine(`Motor:    ${datos.motor}`);
+    if (datos.kmIngreso) addLine(`KM Entrada: ${formatNumber(datos.kmIngreso)}`);
+    if (datos.kmSalida) addLine(`KM Salida:  ${formatNumber(datos.kmSalida)}`);
+    addText('\n');
+    addLine(D);
 
     // Servicios
-    parts.push(ESC + '\x61\x01');
-    parts.push(ESC + '\x45\x01');
-    parts.push(n('- SERVICIOS -'));
-    parts.push(ESC + '\x45\x00');
-    parts.push(ESC + '\x61\x00');
-    parts.push('\n');
+    addCmd([0x1B, 0x61, 0x01]);
+    addCmd([0x1B, 0x45, 0x01]);
+    addLine('- SERVICIOS -');
+    addCmd([0x1B, 0x45, 0x00]);
+    addCmd([0x1B, 0x61, 0x00]);
+    addText('\n');
     if (datos.descripcion) {
         datos.descripcion.split('\n').filter(l => l.trim())
-            .flatMap(l => wrapLine(l)).forEach(l => parts.push(n(l)));
+            .flatMap(l => wrapLine(l)).forEach(l => addLine(l));
     }
-    parts.push('\n');
-    parts.push(n(D));
+    addText('\n');
+    addLine(D);
 
     // Total
     if (datos.precioTotal !== undefined && datos.precioTotal !== null) {
-        parts.push(ESC + '\x45\x01');
-        parts.push(n(twoCol('TOTAL:', `$${datos.precioTotal.toLocaleString('es-CL')}`)));
-        parts.push(ESC + '\x45\x00');
+        addCmd([0x1B, 0x45, 0x01]);
+        addLine(twoCol('TOTAL:', `$${formatNumber(datos.precioTotal)}`));
+        addCmd([0x1B, 0x45, 0x00]);
     }
     if (datos.metodosPago && datos.metodosPago.length) {
         datos.metodosPago.forEach(mp =>
-            parts.push(n(twoCol(`  ${mp.metodo.toUpperCase()}:`, `$${mp.monto.toLocaleString('es-CL')}`)))
+            addLine(twoCol(`  ${mp.metodo.toUpperCase()}:`, `$${formatNumber(mp.monto)}`))
         );
     }
 
     // Pie
-    parts.push('\n');
-    parts.push(n(D2));
-    parts.push(ESC + '\x61\x01');
-    parts.push(n('*** GRACIAS POR SU PREFERENCIA ***'));
-    if (datos.atendidoPor) parts.push(n(`Atendido por: ${datos.atendidoPor}`));
-    parts.push('\n\n\n');
-    parts.push(GS + '\x56\x42\x05');  // Cortar papel
+    addText('\n');
+    addLine(D2);
+    addCmd([0x1B, 0x61, 0x01]);
+    addLine('*** GRACIAS POR SU PREFERENCIA ***');
+    if (datos.atendidoPor) addLine(`Atendido por: ${datos.atendidoPor}`);
+    addText('\n\n\n');
+    addCmd([0x1D, 0x56, 0x42, 0x05]);  // Cortar papel
 
-    return Buffer.from(parts.join(''), 'binary');
+    return Buffer.concat(buffers);
 }
 
 // ──────────────────────────────────────────────

@@ -88,7 +88,10 @@ function buildEscPosBuffer(datos: TicketDatos): Buffer {
     const LF = 0x0a;
 
     const chunks: Buffer[] = [];
-    const t = (s: string) => Buffer.from(s + '\n', 'ascii');
+    // Sanitiza texto eliminando tildes y ñ para PC437
+    const clean = (s: string) => String(s).replace(/ñ/g, 'n').replace(/Ñ/g, 'N').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x00-\x7F]/g, '');
+    const t = (s: string) => Buffer.from(clean(s) + '\n', 'ascii');
+    const fmtNum = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
     // Inicializar + encoding PC437
     chunks.push(Buffer.from([ESC, 0x40]));        // Init impresora
@@ -110,7 +113,8 @@ function buildEscPosBuffer(datos: TicketDatos): Buffer {
     chunks.push(Buffer.from([LF]));
 
     // ---- INFO DEL TICKET ----
-    const fecha = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+    const now = new Date();
+    const fecha = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     chunks.push(t(DIVIDER2));
     chunks.push(t(`Ticket #: ${datos.ordenId}`));
     chunks.push(t(`Fecha:    ${fecha}`));
@@ -122,8 +126,8 @@ function buildEscPosBuffer(datos: TicketDatos): Buffer {
     chunks.push(t(`Patente: ${datos.patente}`));
     if (datos.vehiculo) chunks.push(t(`Vehiculo: ${datos.vehiculo}`));
     if (datos.motor) chunks.push(t(`Motor:    ${datos.motor}`));
-    if (datos.kmIngreso) chunks.push(t(`KM Entrada: ${datos.kmIngreso.toLocaleString('es-CL')}`));
-    if (datos.kmSalida) chunks.push(t(`KM Salida:  ${datos.kmSalida.toLocaleString('es-CL')}`));
+    if (datos.kmIngreso) chunks.push(t(`KM Entrada: ${fmtNum(datos.kmIngreso)}`));
+    if (datos.kmSalida) chunks.push(t(`KM Salida:  ${fmtNum(datos.kmSalida)}`));
     chunks.push(Buffer.from([LF]));
     chunks.push(t(DIVIDER));
 
@@ -147,12 +151,12 @@ function buildEscPosBuffer(datos: TicketDatos): Buffer {
     // ---- TOTAL ----
     if (datos.precioTotal !== undefined && datos.precioTotal !== null) {
         chunks.push(Buffer.from([ESC, 0x45, 0x01]));
-        chunks.push(t(twoColumns('TOTAL:', `$${datos.precioTotal.toLocaleString('es-CL')}`)));
+        chunks.push(t(twoColumns('TOTAL:', `$${fmtNum(datos.precioTotal)}`)));
         chunks.push(Buffer.from([ESC, 0x45, 0x00]));
     }
     if (datos.metodosPago?.length) {
         datos.metodosPago.forEach(mp =>
-            chunks.push(t(twoColumns(`  ${mp.metodo.toUpperCase()}:`, `$${mp.monto.toLocaleString('es-CL')}`)))
+            chunks.push(t(twoColumns(`  ${mp.metodo.toUpperCase()}:`, `$${fmtNum(mp.monto)}`)))
         );
     }
 

@@ -149,17 +149,17 @@ function buildEscPos(datos) {
 // ──────────────────────────────────────────────
 // IMPRIMIR (PowerShell RFCOMM → COM3 → COM5)
 // ──────────────────────────────────────────────
-async function printViaPowerShell(buffer) {
+async function printViaPowerShell(buffer, options = {}) {
+    const { mac, com, baud = 9600 } = options;
+    
     // Buscar el script en la misma carpeta que el ejecutable (si es un .exe)
     // o en la misma carpeta que el .js (si corre con node)
     let scriptPath = path.join(__dirname, 'bt-print.ps1');
     if (process.pkg) {
-        // Si es PKG, buscamos en la carpeta donde esta el .exe real
         scriptPath = path.join(path.dirname(process.execPath), 'bt-print.ps1');
     }
 
     if (!fs.existsSync(scriptPath)) {
-        // Fallback: tratar de encontrarlo en la carpeta interna del snapshot
         const internalPath = path.join(__dirname, 'bt-print.ps1');
         if (fs.existsSync(internalPath)) {
             scriptPath = internalPath;
@@ -167,72 +167,71 @@ async function printViaPowerShell(buffer) {
             throw new Error(`Script bt-print.ps1 no encontrado. Asegurate que este junto al ejecutable en: ${path.dirname(scriptPath)}`);
         }
     }
+
     const tmpFile = path.join(os.tmpdir(), `ticket_${Date.now()}.bin`);
     fs.writeFileSync(tmpFile, buffer);
+
     try {
+        let args = `-dataFile "${tmpFile}"`;
+        if (com) {
+            args += ` -com "${com}" -baud ${baud}`;
+        } else if (mac) {
+            args += ` -mac "${mac}"`;
+        } else {
+            throw new Error("Se requiere MAC o puerto COM para imprimir.");
+        }
+
         await new Promise((resolve, reject) => {
-            exec(
-                `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -dataFile "${tmpFile}" -mac "${BT_MAC}"`,
-                { timeout: 20000 },
-                (err, stdout, stderr) => {
-                    if (err) return reject(new Error(stderr || err.message));
-                    if (stdout.includes('PRINT_OK')) return resolve();
-                    reject(new Error(stderr || stdout || 'Sin respuesta del script'));
+            const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" ${args}`;
+            exec(command, { timeout: 30000 }, (err, stdout, stderr) => {
+                if (err) {
+                    const cleanErr = stderr?.trim() || stdout?.trim() || err.message;
+                    return reject(new Error(cleanErr));
                 }
-            );
+                if (stdout.includes('PRINT_OK')) return resolve();
+                reject(new Error(stderr || stdout || 'Sin respuesta del script'));
+            });
         });
     } finally {
         try { fs.unlinkSync(tmpFile); } catch { }
     }
 }
 
-async function printViaCOM(buffer, comPort) {
-    try {
-        // Carga serialport dinámicamente
-        const { SerialPort } = require('serialport');
-        await new Promise((resolve, reject) => {
-            const port = new SerialPort({ path: comPort, baudRate: BAUD_RATE, autoOpen: false });
-            port.open(openErr => {
-                if (openErr) return reject(new Error(`No se pudo abrir ${comPort}: ${openErr.message}`));
-                port.write(buffer, writeErr => {
-                    if (writeErr) { port.close(() => {}); return reject(new Error(`Error al escribir: ${writeErr.message}`)); }
-                    port.drain(drainErr => {
-                        port.close(() => { if (!drainErr) resolve(); else reject(new Error(`drain error: ${drainErr.message}`)); });
-                    });
-                });
-            });
-            port.on('error', err => reject(new Error(err.message)));
-        });
-    } catch (e) {
-        if (e.message.includes('No native build')) {
-            throw new Error(`Módulo COM no disponible en este ejecutable standalone. Usa Bluetooth.`);
-        }
-        throw e;
-    }
-}
+// Eliminado printViaCOM ya que ahora usamos printViaPowerShell(..., { com })
+
+// La funcion printViaCOM ya no existe
 
 async function imprimir(datos) {
     const buffer = buildEscPos(datos);
     const errors = {};
 
-    // 1. PowerShell RFCOMM (Bluetooth directo por MAC)
+    // 1. Bluetooth directo por MAC (via PowerShell)
     try {
-        await printViaPowerShell(buffer);
+        await printViaPowerShell(buffer, { mac: BT_MAC });
         return { success: true, method: `Bluetooth (${BT_MAC})` };
-    } catch (e) { errors.bluetooth = e.message; }
+    } catch (e) { 
+        errors.bluetooth = e.message; 
+        console.warn(`⚠️ Bluetooth fallo: ${e.message}`);
+    }
 
-    // 2. COM port principal
+    // 2. COM port principal (via PowerShell)
     try {
-        await printViaCOM(buffer, COM_PRIMARY);
+        await printViaPowerShell(buffer, { com: COM_PRIMARY, baud: BAUD_RATE });
         return { success: true, method: COM_PRIMARY };
-    } catch (e) { errors[COM_PRIMARY] = e.message; }
+    } catch (e) { 
+        errors[COM_PRIMARY] = e.message; 
+        console.warn(`⚠️ ${COM_PRIMARY} fallo: ${e.message}`);
+    }
 
-    // 3. COM port secundario
+    // 3. COM port secundario (via PowerShell)
     if (COM_SECONDARY !== COM_PRIMARY) {
         try {
-            await printViaCOM(buffer, COM_SECONDARY);
+            await printViaPowerShell(buffer, { com: COM_SECONDARY, baud: BAUD_RATE });
             return { success: true, method: COM_SECONDARY };
-        } catch (e) { errors[COM_SECONDARY] = e.message; }
+        } catch (e) { 
+            errors[COM_SECONDARY] = e.message; 
+            console.warn(`⚠️ ${COM_SECONDARY} fallo: ${e.message}`);
+        }
     }
 
     return {

@@ -1,0 +1,24 @@
+# INSTRUCCIONES DE IMPRESIÓN - ELECTROMECÁNICA JR
+
+Si la impresora no imprime, sigue estos pasos en orden:
+
+### 1. ¿Está la impresora encendida?
+Asegúrate de que la JP80H tenga papel y la luz verde encendida.
+
+### 2. Verificar Bluetooth
+- Abre el archivo "detect-bt.exe" (o detect-bt.ps1).
+- Busca en la lista "JP80H" o similar.
+- Mira la dirección MAC (ej: 86:67:7A:B9:0F:7F).
+- Si la MAC es distinta a la que aparece en la ventana negra del servidor, avísame.
+
+### 3. Fallo de Bluetooth (Usar Cable COM)
+Si el Bluetooth falla constantemente ("Dispositivo no encontrado"):
+- Conecta la impresora por cable USB.
+- Windows creará un "Puerto COM" (ej: COM3 o COM4).
+- El servidor intentará usar COM3 y COM5 automáticamente si el Bluetooth falla.
+
+### 4. Reiniciar Servidor
+Si cambias algo, cierra la ventana negra y vuelve a abrir "print-server.exe".
+
+---
+*Nota sobre el logo: El logo se imprime automáticamente al principio del ticket siempre que el archivo "logo-ticket-2.png" esté en esta misma carpeta.*

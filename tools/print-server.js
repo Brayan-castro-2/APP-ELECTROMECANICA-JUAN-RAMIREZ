@@ -140,9 +140,22 @@ function buildEscPos(datos) {
 // IMPRIMIR (PowerShell RFCOMM → COM3 → COM5)
 // ──────────────────────────────────────────────
 async function printViaPowerShell(buffer) {
-    const scriptPath = path.join(__dirname, 'bt-print.ps1');
+    // Buscar el script en la misma carpeta que el ejecutable (si es un .exe)
+    // o en la misma carpeta que el .js (si corre con node)
+    let scriptPath = path.join(__dirname, 'bt-print.ps1');
+    if (process.pkg) {
+        // Si es PKG, buscamos en la carpeta donde esta el .exe real
+        scriptPath = path.join(path.dirname(process.execPath), 'bt-print.ps1');
+    }
+
     if (!fs.existsSync(scriptPath)) {
-        throw new Error(`Script bt-print.ps1 no encontrado en ${__dirname}`);
+        // Fallback: tratar de encontrarlo en la carpeta interna del snapshot
+        const internalPath = path.join(__dirname, 'bt-print.ps1');
+        if (fs.existsSync(internalPath)) {
+            scriptPath = internalPath;
+        } else {
+            throw new Error(`Script bt-print.ps1 no encontrado. Asegurate que este junto al ejecutable en: ${path.dirname(scriptPath)}`);
+        }
     }
     const tmpFile = path.join(os.tmpdir(), `ticket_${Date.now()}.bin`);
     fs.writeFileSync(tmpFile, buffer);

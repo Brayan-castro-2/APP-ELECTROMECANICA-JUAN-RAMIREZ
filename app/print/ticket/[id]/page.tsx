@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { obtenerOrdenPorId, buscarVehiculoPorPatente, obtenerPerfilPorId, type OrdenDB, type VehiculoDB, type PerfilDB } from '@/lib/storage-adapter';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, MessageCircle, Printer, Bluetooth, CheckCircle, XCircle } from 'lucide-react';
+import { Download, Loader2, MessageCircle, Printer, Bluetooth, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 
 export default function TicketPage() {
@@ -141,12 +141,12 @@ export default function TicketPage() {
                             setBtMessage(`¡Ticket #${orden.id} enviado a la impresora! ✓`);
                             printedOk = true;
                         } catch {
-                            // Ambos fallaron
+                            // Ambos fallaron (print-server y QZ Tray)
                             throw new Error(
-                                'Para imprimir desde Vercel necesitas el servidor local:\n' +
-                                '1. Abre la carpeta "tools" del proyecto\n' +
-                                '2. Haz doble clic en "iniciar-impresion.bat"\n' +
-                                '3. Deja esa ventana abierta y vuelve a intentar'
+                                'No se detectó el Servidor de Impresión en esta PC.\n\n' +
+                                '1. Descarga el servidor aquí: [/downloads/Impresion-ElectromecanicaJR.zip]\n' +
+                                '2. Descomprime el archivo y abre "print-server.exe"\n' +
+                                '3. Deja la ventana abierta y vuelve a intentar.'
                             );
                         }
                     } else {
@@ -272,13 +272,31 @@ export default function TicketPage() {
 
             {/* Feedback Bluetooth */}
             {btStatus !== 'idle' && (
-                <div className={`print:hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 ${btStatus === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                <div className={`print:hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-4 rounded-xl shadow-xl text-sm font-medium flex flex-col gap-2 max-w-[90vw] whitespace-pre-wrap ${btStatus === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
                     }`}>
-                    {btStatus === 'success'
-                        ? <CheckCircle className="w-4 h-4" />
-                        : <XCircle className="w-4 h-4" />
-                    }
-                    {btMessage}
+                    <div className="flex items-center gap-2">
+                        {btStatus === 'success'
+                            ? <CheckCircle className="w-5 h-5" />
+                            : <XCircle className="w-5 h-5" />
+                        }
+                        <span className="flex-1">
+                            {btMessage.split('[/downloads/Impresion-ElectromecanicaJR.zip]').map((part, i, arr) => (
+                                <span key={i}>
+                                    {part}
+                                    {i < arr.length - 1 && (
+                                        <a
+                                            href="/downloads/Impresion-ElectromecanicaJR.zip"
+                                            className="bg-white text-red-600 px-3 py-1 rounded-md font-bold inline-flex items-center mx-1 hover:bg-gray-100 transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Download className="w-4 h-4 mr-1" />
+                                            DESCARGAR AQUÍ
+                                        </a>
+                                    )}
+                                </span>
+                            ))}
+                        </span>
+                    </div>
                 </div>
             )}
 

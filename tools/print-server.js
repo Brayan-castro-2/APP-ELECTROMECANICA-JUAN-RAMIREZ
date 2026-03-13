@@ -28,6 +28,9 @@ const BT_MAC = process.env.PRINTER_MAC || '86:67:7A:B9:0F:7F';
 const BAUD_RATE = 9600;
 // Dominio de la app en Vercel (para CORS)
 const VERCEL_ORIGIN = process.env.APP_ORIGIN || 'https://app-electromecanica-juan-ramirez.vercel.app';
+const LOGO_FILENAME = 'logo-ticket-2.png';
+
+let cachedLogoBuffer = null;
 
 // ──────────────────────────────────────────────
 // ESC/POS BUILDER
@@ -65,6 +68,13 @@ function buildEscPos(datos) {
 
     parts.push(ESC + '@');           // Init
     parts.push(ESC + '\x74\x00');   // PC437
+
+    // Logo (si está cargado)
+    if (cachedLogoBuffer) {
+        parts.push(ESC + '\x61\x01');   // Centrar logo
+        parts.push(cachedLogoBuffer);
+        parts.push('\n');
+    }
 
     // Encabezado
     parts.push(ESC + '\x61\x01');   // Centrar
@@ -242,6 +252,40 @@ const CORS_HEADERS = {
     'Content-Type': 'application/json',
 };
 
+// ──────────────────────────────────────────────
+// INICIO Y CARGA DE RECURSOS
+// ──────────────────────────────────────────────
+async function loadLogo() {
+    let logoPath = path.join(__dirname, LOGO_FILENAME);
+    if (process.pkg) {
+        logoPath = path.join(path.dirname(process.execPath), LOGO_FILENAME);
+    }
+
+    if (!fs.existsSync(logoPath)) {
+        console.log(`ℹ️  Logo no encontrado en: ${logoPath}. Saltando impresión de logo.`);
+        return;
+    }
+
+    console.log(`🖼️  Cargando logo: ${logoPath}...`);
+    try {
+        const psCommand = `Add-Type -AssemblyName System.Drawing; $bmp=[System.Drawing.Bitmap]::FromFile('${logoPath}'); $w=$bmp.Width; $h=$bmp.Height; $wb=[Math]::Ceiling($w/8); $xL=$wb%256; $xH=[Math]::Floor($wb/256); $yL=$h%256; $yH=[Math]::Floor($h/256); $header=@(0x1D,0x76,0x30,0x00,$xL,$xH,$yL,$yH); $data=New-Object byte[]($wb*$h); $idx=0; for($y=0;$y-lt $h;$y++){for($x=0;$x-lt $wb;$x++){$b=0; for($bit=0;$bit-lt 8;$bit++){$px=($x*8)+$bit; if($px-lt $w){$p=$bmp.GetPixel($px,$y); if(($p.R+$p.G+$p.B)/3 -lt 128){$b=$b -bor (1 -shl (7-$bit))}}}; $data[$idx++]=$b}}; $bmp.Dispose(); $all=$header+$data; [System.BitConverter]::ToString($all).Replace('-','')`;
+
+        const hex = await new Promise((resolve, reject) => {
+            exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout, stderr) => {
+                if (err) return reject(new Error(stderr || err.message));
+                resolve(stdout.trim());
+            });
+        });
+
+        if (hex && hex.length > 20) {
+            cachedLogoBuffer = Buffer.from(hex, 'hex');
+            console.log(`✅ Logo cargado con éxito (${cachedLogoBuffer.length} bytes).`);
+        }
+    } catch (err) {
+        console.error(`❌ Error cargando logo:`, err.message);
+    }
+}
+
 const server = http.createServer(async (req, res) => {
     // CORS preflight
     if (req.method === 'OPTIONS') {
@@ -284,7 +328,8 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ error: 'Ruta no encontrada' }));
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
+    await loadLogo();
     console.log('');
     console.log('╔══════════════════════════════════════════╗');
     console.log('║   Servidor de Impresión - Electromec. JR ║');

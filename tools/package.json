@@ -4,7 +4,8 @@
     "description": "Servidor de impresión local para impresora térmica JP80H",
     "main": "print-server.js",
     "scripts": {
-        "start": "node print-server.js"
+        "start": "node print-server.js",
+        "build": "pkg . --targets node18-win-x64 --output print-server.exe"
     },
     "dependencies": {
         "serialport": "^12.0.0"

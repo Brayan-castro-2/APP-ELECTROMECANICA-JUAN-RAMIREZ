@@ -16,21 +16,32 @@ function Convert-MacToUlong {
     return [System.Convert]::ToUInt64($hex, 16)
 }
 
-# Helper async/await para WinRT en PowerShell
+# Helper async para WinRT en PowerShell (v5.1 compatible)
 function Await-Task {
-    param($asyncOperation)
-    try {
-        $awaiter = $asyncOperation.GetAwaiter()
-        $deadline = [DateTime]::Now.AddSeconds(10)
-        while (-not $awaiter.IsCompleted) { 
-            Start-Sleep -Milliseconds 100
-            if ([DateTime]::Now -gt $deadline) {
-                throw "Timeout esperando operacion Bluetooth"
-            }
+    param($asyncOp)
+    $deadline = [DateTime]::Now.AddSeconds(15)
+    
+    # Esperar a que termine la operacion
+    while ($asyncOp.Status -eq 'Started' -or $asyncOp.Status -eq 'Running') {
+        Start-Sleep -Milliseconds 50
+        if ([DateTime]::Now -gt $deadline) {
+            throw "Timeout esperando operacion Bluetooth (15s)"
         }
-        return $awaiter.GetResult()
+    }
+
+    if ($asyncOp.Status -eq 'Error') {
+        throw "Error en operacion Bluetooth: $($asyncOp.ErrorCode)"
+    }
+
+    if ($asyncOp.Status -eq 'Canceled') {
+        throw "Operacion Bluetooth cancelada"
+    }
+
+    # Intentar obtener resultados (IAsyncOperation lo tiene, IAsyncAction no)
+    try {
+        return $asyncOp.GetResults()
     } catch {
-        throw $_.Exception
+        return $null # Para IAsyncAction que no devuelve nada
     }
 }
 

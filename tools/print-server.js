@@ -177,21 +177,28 @@ async function printViaPowerShell(buffer) {
 }
 
 async function printViaCOM(buffer, comPort) {
-    // Carga serialport dinámicamente
-    const { SerialPort } = require('serialport');
-    await new Promise((resolve, reject) => {
-        const port = new SerialPort({ path: comPort, baudRate: BAUD_RATE, autoOpen: false });
-        port.open(openErr => {
-            if (openErr) return reject(new Error(`No se pudo abrir ${comPort}: ${openErr.message}`));
-            port.write(buffer, writeErr => {
-                if (writeErr) { port.close(() => { }); return reject(new Error(`Error al escribir: ${writeErr.message}`)); }
-                port.drain(drainErr => {
-                    port.close(() => { if (!drainErr) resolve(); else reject(new Error(`drain error: ${drainErr.message}`)); });
+    try {
+        // Carga serialport dinámicamente
+        const { SerialPort } = require('serialport');
+        await new Promise((resolve, reject) => {
+            const port = new SerialPort({ path: comPort, baudRate: BAUD_RATE, autoOpen: false });
+            port.open(openErr => {
+                if (openErr) return reject(new Error(`No se pudo abrir ${comPort}: ${openErr.message}`));
+                port.write(buffer, writeErr => {
+                    if (writeErr) { port.close(() => {}); return reject(new Error(`Error al escribir: ${writeErr.message}`)); }
+                    port.drain(drainErr => {
+                        port.close(() => { if (!drainErr) resolve(); else reject(new Error(`drain error: ${drainErr.message}`)); });
+                    });
                 });
             });
+            port.on('error', err => reject(new Error(err.message)));
         });
-        port.on('error', err => reject(new Error(err.message)));
-    });
+    } catch (e) {
+        if (e.message.includes('No native build')) {
+            throw new Error(`Módulo COM no disponible en este ejecutable standalone. Usa Bluetooth.`);
+        }
+        throw e;
+    }
 }
 
 async function imprimir(datos) {

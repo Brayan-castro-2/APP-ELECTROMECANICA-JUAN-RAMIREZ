@@ -18,9 +18,12 @@ import {
     Gauge,
     ChevronDown,
     ChevronUp,
-    FileText
+    FileText,
+    Printer,
+    Bluetooth
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PrintTicketButton } from '@/components/printing/PrintTicketButton';
 
 export default function MecanicoOrdenesPage() {
     const { user } = useAuth();
@@ -169,7 +172,8 @@ export default function MecanicoOrdenesPage() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                {!(orden as any).isAppointment && <PrintTicketButton order={orden as any} />}
                                                     {getEstadoBadge(orden.estado)}
                                                     {isExpanded
                                                         ? <ChevronUp className="w-4 h-4 text-gray-500" />

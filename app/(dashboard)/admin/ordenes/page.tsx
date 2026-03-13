@@ -30,9 +30,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Search, FileText, ChevronRight, Loader2, Trash2, Edit, Download, ChevronDown, Calendar, User, Wrench, DollarSign, CheckCircle } from 'lucide-react';
+import { Search, FileText, ChevronRight, Loader2, Trash2, Edit, Download, ChevronDown, Calendar, User, Wrench, DollarSign, CheckCircle, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { PrintTicketButton } from '@/components/printing/PrintTicketButton';
 // import { NewBadge } from '@/components/ui/new-badge';
 
 export default function OrdenesPage() {
@@ -221,6 +222,7 @@ export default function OrdenesPage() {
             cliente_nombre: appt.cliente_nombre,
             cliente_telefono: appt.cliente_telefono,
             isAppointment: true,
+            vehiculos: null,
             // Add other required fields with defaults
             detalle_trabajos: appt.notas,
         } as any;
@@ -680,6 +682,7 @@ export default function OrdenesPage() {
                                                         >
                                                             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                                         </Button>
+                                                        {!(order as any).isAppointment && <PrintTicketButton order={order as any} />}
                                                         <Link href={`/admin/ordenes/clean?id=${order.id}`} onClick={(e) => e.stopPropagation()}>
                                                             <Button size="sm" variant="ghost" className="text-blue-400 hover:text-blue-300 h-8 w-8 p-0">
                                                                 <Edit className="w-3.5 h-3.5" />
@@ -978,6 +981,7 @@ export default function OrdenesPage() {
                                                 {getStatusBadge(order.estado, order.id, true)}
                                             </div>
                                             <div className="flex items-center gap-1 flex-shrink-0">
+                                                {!(order as any).isAppointment && <PrintTicketButton order={order as any} />}
                                                 <Link href={`/admin/ordenes/clean?id=${order.id}`}>
                                                     <Button size="sm" variant="ghost" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 h-8 px-2">
                                                         <Edit className="w-3.5 h-3.5" />

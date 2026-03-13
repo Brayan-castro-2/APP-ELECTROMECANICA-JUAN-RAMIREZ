@@ -21,11 +21,13 @@ const MOCK_DB: Record<string, { marca: string; modelo: string; anio: string; mot
 };
 
 const SERVICIOS_FRECUENTES = [
-    'DPF Electrónico',
-    'DPF Físico',
-    'Scanner',
-    'AdBlue OFF',
-    'Regeneración',
+    { label: 'KM', descripcion: 'REPARACION DE KILOMETRAJE' },
+    { label: 'DPF Electrónico', descripcion: 'DPF OFF ELECTRONICO' },
+    { label: 'DPF Físico', descripcion: 'VACIADO FISICO' },
+    { label: 'ADBLUE OFF', descripcion: 'ADBLUE OFF ELECTRONICO' },
+    { label: 'Regeneración', descripcion: 'REGENERACION FILTRO PARTICULAS' },
+    { label: 'Scanner', descripcion: 'DIAGNOSTICO CON SCANNER' },
+    { label: 'Airbag', descripcion: 'REPARACION SISTEMA AIRBAG' },
 ];
 
 type Servicio = { descripcion: string; precio: string };
@@ -453,8 +455,14 @@ function RecepcionContent() {
         setServicios((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
     };
 
-    const agregarServicioFrecuente = (descripcion: string) => {
-        agregarFila({ descripcion });
+    const agregarServicioFrecuente = (label: string, descripcion: string) => {
+        // Toggle: si ya existe, lo quita. Si no existe, lo agrega.
+        const existIdx = servicios.findIndex(s => s.descripcion === descripcion);
+        if (existIdx >= 0) {
+            eliminarFila(existIdx);
+        } else {
+            agregarFila({ descripcion });
+        }
     };
 
     const activarServicioKm = () => {
@@ -774,27 +782,42 @@ function RecepcionContent() {
                 <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">SERVICIOS</div>
 
                 <div className="mb-4 flex flex-wrap gap-2">
+                    {SERVICIOS_FRECUENTES.map((s) => {
+                        const isKm = s.label === 'KM';
+                        const isActive = isKm ? kmEnabled : servicios.some(srv => srv.descripcion === s.descripcion);
+                        return (
+                            <button
+                                key={s.label}
+                                type="button"
+                                onClick={() => {
+                                    if (isKm) {
+                                        if (kmEnabled) {
+                                            desactivarServicioKm();
+                                        } else {
+                                            activarServicioKm();
+                                        }
+                                    } else {
+                                        agregarServicioFrecuente(s.label, s.descripcion);
+                                    }
+                                }}
+                                className={isActive
+                                    ? 'rounded-full border border-blue-500 bg-blue-600/30 px-3 py-2 text-sm font-semibold text-blue-100'
+                                    : 'rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700'
+                                }
+                            >
+                                {isActive ? '✅' : '🔘'} {s.label}
+                            </button>
+                        );
+                    })}
                     <button
                         type="button"
-                        onClick={() => (kmEnabled ? desactivarServicioKm() : activarServicioKm())}
-                        className={kmEnabled
-                            ? 'rounded-full border border-blue-500 bg-blue-600/30 px-3 py-2 text-sm font-semibold text-blue-100'
-                            : 'rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700'
-                        }
+                        onClick={() => agregarFila()}
+                        className="rounded-full border border-dashed border-slate-600 bg-slate-800/40 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700"
                     >
-                        🔘 KM
+                        ✏️ Otro
                     </button>
-                    {SERVICIOS_FRECUENTES.map((s) => (
-                        <button
-                            key={s}
-                            type="button"
-                            onClick={() => agregarServicioFrecuente(s)}
-                            className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700"
-                        >
-                            🔘 {s}
-                        </button>
-                    ))}
                 </div>
+
 
                 {kmEnabled && (
                     <div className="mb-4 grid gap-4 rounded-xl border border-slate-700 bg-slate-800/30 p-4 md:grid-cols-2 animate-in slide-in-from-top-2">

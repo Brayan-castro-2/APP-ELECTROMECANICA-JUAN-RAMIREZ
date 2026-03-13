@@ -283,23 +283,89 @@ async function loadLogo() {
 
     console.log(`🖼️  Cargando logo: ${logoPath}...`);
     try {
-        const psCommand = `Add-Type -AssemblyName System.Drawing; $bmp=[System.Drawing.Bitmap]::FromFile('${logoPath}'); $w=$bmp.Width; $h=$bmp.Height; $wb=[Math]::Ceiling($w/8); $xL=$wb%256; $xH=[Math]::Floor($wb/256); $yL=$h%256; $yH=[Math]::Floor($h/256); $header=@(0x1D,0x76,0x30,0x00,$xL,$xH,$yL,$yH); $data=New-Object byte[]($wb*$h); $idx=0; for($y=0;$y-lt $h;$y++){for($x=0;$x-lt $wb;$x++){$b=0; for($bit=0;$bit-lt 8;$bit++){$px=($x*8)+$bit; if($px-lt $w){$p=$bmp.GetPixel($px,$y); if(($p.R+$p.G+$p.B)/3 -lt 128){$b=$b -bor (1 -shl (7-$bit))}}}; $data[$idx++]=$b}}; $bmp.Dispose(); $all=$header+$data; [System.BitConverter]::ToString($all).Replace('-','')`;
+        // Script PS que:
+        // 1. Carga la imagen sobre un fondo blanco (maneja transparencia)
+        // 2. Usa umbral alto (180) para que solo lo realmente oscuro se imprima
+        // 3. Convierte a formato raster bit-image ESC/POS
+        const psScript = `
+Add-Type -AssemblyName System.Drawing
+$src = [System.Drawing.Image]::FromFile('${logoPath.replace(/\\/g, '\\\\')}')
+$w = $src.Width; $h = $src.Height
+# Crear bitmap sobre fondo BLANCO para manejar transparencia
+$bmp = New-Object System.Drawing.Bitmap($w, $h)
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.Clear([System.Drawing.Color]::White)
+$g.DrawImage($src, 0, 0, $w, $h)
+$g.Dispose(); $src.Dispose()
+$wb = [Math]::Ceiling($w / 8)
+$xL = $wb % 256; $xH = [Math]::Floor($wb / 256)
+$yL = $h % 256; $yH = [Math]::Floor($h / 256)
+$header = @(0x1D, 0x76, 0x30, 0x00, $xL, $xH, $yL, $yH)
+$data = New-Object byte[] ($wb * $h)
+$idx = 0
+for ($y = 0; $y -lt $h; $y++) {
+    for ($x = 0; $x -lt $wb; $x++) {
+        $b = 0
+        for ($bit = 0; $bit -lt 8; $bit++) {
+            $px = ($x * 8) + $bit
+            if ($px -lt $w) {
+                $p = $bmp.GetPixel($px, $y)
+                $brightness = ($p.R * 0.299 + $p.G * 0.587 + $p.B * 0.114)
+                if ($brightness -lt 100) {
+                    $b = $b -bor (1 -shl (7 - $bit))
+                }
+            }
+        }
+        $data[$idx++] = $b
+    }
+}
+$bmp.Dispose()
+$all = $header + $data
+[System.BitConverter]::ToString($all).Replace('-','')
+`;
+        const tmpPs = path.join(os.tmpdir(), 'convert_logo.ps1');
+        fs.writeFileSync(tmpPs, psScript, 'utf8');
 
         const hex = await new Promise((resolve, reject) => {
-            exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout, stderr) => {
+            exec(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${tmpPs}"`, { maxBuffer: 1024 * 1024 * 10, timeout: 30000 }, (err, stdout, stderr) => {
                 if (err) return reject(new Error(stderr || err.message));
                 resolve(stdout.trim());
             });
         });
 
+        try { fs.unlinkSync(tmpPs); } catch {}
+
         if (hex && hex.length > 20) {
             cachedLogoBuffer = Buffer.from(hex, 'hex');
             console.log(`✅ Logo cargado con éxito (${cachedLogoBuffer.length} bytes).`);
+        } else {
+            console.warn('⚠️ Logo generó datos vacíos.');
         }
     } catch (err) {
         console.error(`❌ Error cargando logo:`, err.message);
     }
 }
+
+// Detectar puertos COM disponibles al inicio
+async function detectComPorts() {
+    try {
+        const result = await new Promise((resolve, reject) => {
+            exec('powershell.exe -NoProfile -Command "Get-WMIObject Win32_SerialPort | Select-Object DeviceID,Description | Format-Table -AutoSize"', { timeout: 10000 }, (err, stdout) => {
+                if (err) return reject(err);
+                resolve(stdout);
+            });
+        });
+        if (result && result.trim()) {
+            console.log('📡 Puertos COM detectados:');
+            console.log(result);
+        } else {
+            console.log('ℹ️  No se detectaron puertos COM. Se usará Bluetooth.');
+        }
+    } catch {
+        // Silencioso - no es crítico
+    }
+}
+
 
 const server = http.createServer(async (req, res) => {
     // CORS preflight
@@ -345,6 +411,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, async () => {
     await loadLogo();
+    await detectComPorts();
     console.log('');
     console.log('╔══════════════════════════════════════════╗');
     console.log('║   Servidor de Impresión - Electromec. JR ║');

@@ -132,8 +132,8 @@ function buildEscPos(datos) {
     addCmd([0x1B, 0x61, 0x00]);
     addText('\n');
     if (datos.descripcion) {
-        datos.descripcion.split('\n').filter(l => l.trim())
-            .flatMap(l => wrapLine(l)).forEach(l => addLine(l));
+        datos.descripcion.split(/[,\n]/).filter(l => l.trim())
+            .flatMap(l => wrapLine(l.trim())).forEach(l => addLine(l));
     }
     addText('\n');
     addLine(D);

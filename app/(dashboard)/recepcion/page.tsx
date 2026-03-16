@@ -21,13 +21,13 @@ const MOCK_DB: Record<string, { marca: string; modelo: string; anio: string; mot
 };
 
 const SERVICIOS_FRECUENTES = [
-    { label: 'KM', descripcion: 'REPARACION DE KILOMETRAJE' },
+    { label: 'KM', descripcion: 'KM' },
     { label: 'DPF Electrónico', descripcion: 'DPF OFF ELECTRONICO' },
-    { label: 'DPF Físico', descripcion: 'VACIADO FISICO' },
-    { label: 'ADBLUE OFF', descripcion: 'ADBLUE OFF ELECTRONICO' },
-    { label: 'Regeneración', descripcion: 'REGENERACION FILTRO PARTICULAS' },
-    { label: 'Scanner', descripcion: 'DIAGNOSTICO CON SCANNER' },
-    { label: 'Airbag', descripcion: 'REPARACION SISTEMA AIRBAG' },
+    { label: 'DPF Físico', descripcion: 'DPF FÍSICO' },
+    { label: 'ADBLUE OFF', descripcion: 'ADBLUE OFF' },
+    { label: 'Regeneración', descripcion: 'REGENERACIÓN' },
+    { label: 'Scanner', descripcion: 'SCANNER' },
+    { label: 'Airbag', descripcion: 'AIRBAG' },
 ];
 
 type Servicio = { descripcion: string; precio: string };
@@ -437,6 +437,11 @@ function RecepcionContent() {
 
     const agregarFila = (prefill?: { descripcion?: string }) => {
         setServicios((prev) => {
+            if (prev.length === 1 && !prev[0].descripcion && !prev[0].precio) {
+                const next = [{ descripcion: prefill?.descripcion || '', precio: '' }];
+                setFocusTarget({ index: 0, field: prefill?.descripcion ? 'precio' : 'desc' });
+                return next;
+            }
             const next = [...prev, { descripcion: prefill?.descripcion || '', precio: '' }];
             const idx = next.length - 1;
             setFocusTarget({ index: idx, field: prefill?.descripcion ? 'precio' : 'desc' });
@@ -501,22 +506,25 @@ function RecepcionContent() {
             return;
         }
 
-        // Descripción concisa para la columna Motivo (Ej: "KM, DPF")
-        const shortDescription = serviciosForOrder
-            .map((s) => {
-                const d = (s.descripcion || '').toUpperCase();
-                if (d.includes('DPF')) return 'DPF';
-                if (d.includes('SCANNER')) return 'Scanner';
-                if (d.includes('ADBLUE')) return 'AdBlue';
-                if (d.includes('EGR')) return 'EGR';
-                if (d.includes('REGENERACION') || d.includes('REGENERACIÓN')) return 'Regeneración';
-                return s.descripcion;
-            })
-            // Unique values only
-            .filter((value, index, self) => self.indexOf(value) === index)
-            .join(', ');
+        const expandirDesc = (desc: string) => {
+            const d = desc.toUpperCase().trim();
+            if (d === 'KM') return 'REPARACION DE KILOMETRAJE';
+            if (d === 'DPF OFF ELECTRONICO' || d === 'DPF ELECTRÓNICO') return 'DPF OFF ELECTRONICO';
+            if (d === 'DPF FÍSICO' || d === 'DPF FISICO') return 'VACIADO FÍSICO';
+            if (d === 'ADBLUE OFF') return 'ADBLUE OFF ELECTRÓNICO';
+            if (d === 'REGENERACIÓN' || d === 'REGENERACION') return 'REGENERACIÓN FILTRO PARTÍCULAS';
+            if (d === 'SCANNER') return 'DIAGNÓSTICO CON SCANNER';
+            if (d === 'AIRBAG') return 'REPARACION SISTEMA AIRBAG';
+            return desc;
+        };
 
-        const descripcionIngreso = shortDescription;
+        const descripcionIngreso = serviciosForOrder
+            .map((s) => {
+                const descExpanded = expandirDesc(s.descripcion);
+                return s.precio > 0 ? `${descExpanded} - $${moneyCL(s.precio)}` : descExpanded;
+            })
+            .filter((value, index, self) => self.indexOf(value) === index)
+            .join('\n');
 
         // Detalle completo con precios para el registro interno (detalle_trabajos)
         const detalleServicios = serviciosForOrder

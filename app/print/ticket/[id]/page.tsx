@@ -83,7 +83,7 @@ export default function TicketPage() {
             motor: vehiculo?.motor || null,
             kmIngreso: (orden as any).kilometraje || null,
             kmSalida: (orden as any).kilometraje_salida || null,
-            descripcion: orden.descripcion_ingreso,
+            descripcion: orden.detalle_trabajos || orden.descripcion_ingreso,
             precioTotal: orden.precio_total,
             metodosPago: (orden as any).metodos_pago || null,
             atendidoPor: mecanico?.nombre_completo?.split(' ')[0] || null,
@@ -358,8 +358,12 @@ export default function TicketPage() {
                 {/* Services */}
                 <div className="mb-4 border-b border-dashed border-black pb-4">
                     <p className="font-bold mb-2 uppercase text-center">- Detalle de Servicios -</p>
-                    <div className="whitespace-pre-wrap mb-2 text-xs">
-                        {orden.descripcion_ingreso}
+                    <div className="mb-2 text-xs flex flex-col items-center justify-center font-medium gap-1 text-center">
+                        {(orden.detalle_trabajos || orden.descripcion_ingreso)?.split(/[,\n]/).map((serv, idx) => {
+                            const trimmed = serv.trim();
+                            if (!trimmed) return null;
+                            return <div key={idx}>{trimmed}</div>;
+                        })}
                     </div>
                 </div>
 

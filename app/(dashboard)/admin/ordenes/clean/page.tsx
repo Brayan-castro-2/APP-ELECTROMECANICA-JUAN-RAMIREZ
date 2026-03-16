@@ -48,6 +48,22 @@ export default function OrdenesCleanPage() {
     const [clienteTelefono, setClienteTelefono] = useState<string>('');
     const [metodosPago, setMetodosPago] = useState<Array<{ metodo: string; monto: number }>>([]);
 
+    // Servicios individuales con precio
+    type ServicioItem = { nombre: string; precio: number };
+    const [serviciosItems, setServiciosItems] = useState<ServicioItem[]>([]);
+
+    const SERVICIOS_CATALOGO = [
+        { label: 'KM', desc: 'REPARACION DE KILOMETRAJE' },
+        { label: 'DPF Electrónico', desc: 'DPF OFF ELECTRONICO' },
+        { label: 'DPF Físico', desc: 'VACIADO FISICO' },
+        { label: 'ADBLUE OFF', desc: 'ADBLUE OFF ELECTRONICO' },
+        { label: 'Regeneración', desc: 'REGENERACION FILTRO PARTICULAS' },
+        { label: 'Scanner', desc: 'DIAGNOSTICO CON SCANNER' },
+        { label: 'Airbag', desc: 'REPARACION SISTEMA AIRBAG' },
+    ];
+
+    const totalServicios = serviciosItems.reduce((sum, s) => sum + s.precio, 0);
+
     const canViewPrices = user?.name?.toLowerCase().includes('juan');
 
     const parsePrecio = (value: string) => {
@@ -93,7 +109,33 @@ export default function OrdenesCleanPage() {
                 setClienteTelefono(ordenData.cliente_telefono || '');
                 setMetodosPago(ordenData.metodos_pago || []);
 
-                setMetodosPago(ordenData.metodos_pago || []);
+                // Parsear servicios desde detalle_trabajos o descripcion_ingreso
+                const detalleRaw = ordenData.detalle_trabajos || '';
+                const descRaw = ordenData.descripcion_ingreso || '';
+                let parsedServicios: ServicioItem[] = [];
+
+                // Intentar parsear desde detalle_trabajos (formato "- SERVICIO: $PRECIO")
+                const detalleLines = detalleRaw.split('\n').filter(l => l.trim().startsWith('-'));
+                if (detalleLines.length > 0) {
+                    parsedServicios = detalleLines.map(line => {
+                        const match = line.match(/^-\s*(.+?):\s*\$?([\d.,]+)/);
+                        if (match) {
+                            return { nombre: match[1].trim(), precio: parseInt(match[2].replace(/\D/g, '')) || 0 };
+                        }
+                        return { nombre: line.replace(/^-\s*/, '').trim(), precio: 0 };
+                    });
+                } else {
+                    // Fallback: parsear desde descripcion_ingreso (separados por comas)
+                    const items = descRaw.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+                    parsedServicios = items.map(nombre => ({ nombre, precio: 0 }));
+                }
+
+                if (parsedServicios.length > 0) {
+                    setServiciosItems(parsedServicios);
+                } else {
+                    setServiciosItems([{ nombre: '', precio: 0 }]);
+                }
+
                 setKmIngreso(ordenData.kilometraje ? String(ordenData.kilometraje) : '');
                 setKmSalida(ordenData.kilometraje_salida ? String(ordenData.kilometraje_salida) : '');
 
@@ -227,7 +269,8 @@ export default function OrdenesCleanPage() {
         if (!order) return;
         if (user?.role !== 'admin') return;
 
-        const precio = parsePrecio(precioFinal);
+        // Calcular precio total desde servicios
+        const precio = totalServicios;
         if (precio < 0) {
             alert('El precio no puede ser negativo');
             return;
@@ -242,21 +285,29 @@ export default function OrdenesCleanPage() {
             }
         }
 
-        // NOTA: Ya no inyectamos "KM: X -> Y" en la descripción porque ahora son columnas reales.
-        const descripcionActualizada = descripcion;
+        // Construir descripcion_ingreso desde servicios
+        const serviciosValidos = serviciosItems.filter(s => s.nombre.trim());
+        const descripcionNueva = serviciosValidos
+            .map(s => s.precio > 0 ? `${s.nombre.trim()} - $${s.precio.toLocaleString('es-CL')}` : s.nombre.trim())
+            .join('\n');
+
+        // Construir detalle_trabajos con precios individuales
+        const detalleNuevo = serviciosValidos
+            .map(s => `- ${s.nombre.trim()}: $${s.precio.toLocaleString('es-CL')}`)
+            .join('\n');
 
         setIsSaving(true);
 
-        // PREPARAR PAYLOAD: Usar any para permitir nulls explícitos en campos opcionales
+        // PREPARAR PAYLOAD
         const updateData: any = {
-            descripcion_ingreso: descripcion,
+            descripcion_ingreso: descripcionNueva,
             estado,
-            precio_total: parsePrecio(precioFinal),
+            precio_total: precio,
             cliente_nombre: clienteNombre || null,
             cliente_telefono: clienteTelefono || null,
             metodos_pago: metodosPago.length > 0 ? metodosPago : null,
             asignado_a: asignadoA || null,
-            detalle_trabajos: detalleTrabajos || null,
+            detalle_trabajos: detalleNuevo || null,
             kilometraje: kmIngreso ? Number(kmIngreso) : null,
             kilometraje_salida: kmSalida ? Number(kmSalida) : null,
         };
@@ -480,14 +531,114 @@ export default function OrdenesCleanPage() {
                     )}
                     {user?.role === 'admin' ? (
                         <>
-                            <div className="space-y-2">
-                                <Label className="text-slate-300">Motivo de Ingreso</Label>
-                                <Textarea
-                                    value={descripcion}
-                                    onChange={(e) => setDescripcion(e.target.value)}
-                                    className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
-                                    placeholder="Describe el motivo de ingreso del vehículo..."
-                                />
+                            {/* ── SERVICIOS CON PRECIO INDIVIDUAL ── */}
+                            <div className="space-y-3">
+                                <Label className="text-slate-300 text-base">Servicios</Label>
+
+                                {/* Botones rápidos de servicios */}
+                                <div className="flex flex-wrap gap-2">
+                                    {SERVICIOS_CATALOGO.map((cat) => {
+                                        const isActive = serviciosItems.some(s => s.nombre.toUpperCase() === cat.desc.toUpperCase());
+                                        return (
+                                            <button
+                                                key={cat.label}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isActive) {
+                                                        setServiciosItems(prev => prev.filter(s => s.nombre.toUpperCase() !== cat.desc.toUpperCase()));
+                                                    } else {
+                                                        setServiciosItems(prev => {
+                                                            if (prev.length === 1 && !prev[0].nombre && !prev[0].precio) {
+                                                                return [{ nombre: cat.desc, precio: 0 }];
+                                                            }
+                                                            return [...prev, { nombre: cat.desc, precio: 0 }];
+                                                        });
+                                                    }
+                                                }}
+                                                className={isActive
+                                                    ? 'rounded-full border border-blue-500 bg-blue-600/30 px-3 py-1.5 text-xs font-semibold text-blue-100'
+                                                    : 'rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700'
+                                                }
+                                            >
+                                                {isActive ? '✅' : '🔘'} {cat.label}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => setServiciosItems(prev => {
+                                            if (prev.length === 1 && !prev[0].nombre && !prev[0].precio) {
+                                                return [{ nombre: '', precio: 0 }];
+                                            }
+                                            return [...prev, { nombre: '', precio: 0 }];
+                                        })}
+                                        className="rounded-full border border-dashed border-slate-600 bg-slate-800/40 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+                                    >
+                                        ✏️ Otro
+                                    </button>
+                                </div>
+
+                                {/* Tabla de servicios */}
+                                <div className="rounded-xl border border-slate-700 overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-slate-800/70">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-xs font-semibold tracking-widest text-slate-300">SERVICIO</th>
+                                                <th className="px-3 py-2 text-left text-xs font-semibold tracking-widest text-slate-300 w-[130px]">PRECIO ($)</th>
+                                                <th className="px-3 py-2 text-right text-xs font-semibold tracking-widest text-slate-300 w-[60px]"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700">
+                                            {serviciosItems.map((s, idx) => (
+                                                <tr key={idx} className="bg-slate-900/40">
+                                                    <td className="px-3 py-2">
+                                                        <Input
+                                                            value={s.nombre}
+                                                            onChange={(e) => {
+                                                                const updated = [...serviciosItems];
+                                                                updated[idx].nombre = e.target.value;
+                                                                setServiciosItems(updated);
+                                                            }}
+                                                            className="bg-slate-700/50 border-slate-600 text-white rounded-lg text-sm"
+                                                            placeholder="Nombre del servicio"
+                                                        />
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <Input
+                                                            value={s.precio > 0 ? formatPrecio(s.precio) : ''}
+                                                            onChange={(e) => {
+                                                                const updated = [...serviciosItems];
+                                                                updated[idx].precio = parsePrecio(e.target.value);
+                                                                setServiciosItems(updated);
+                                                            }}
+                                                            inputMode="numeric"
+                                                            className="bg-slate-700/50 border-slate-600 text-white rounded-lg text-sm"
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const updated = serviciosItems.filter((_, i) => i !== idx);
+                                                                setServiciosItems(updated.length > 0 ? updated : [{ nombre: '', precio: 0 }]);
+                                                            }}
+                                                            className="text-red-400 hover:text-red-300 text-lg"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Total calculado */}
+                                <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-600 bg-slate-800/30 p-4">
+                                    <span className="text-xs font-semibold tracking-widest text-slate-300">TOTAL</span>
+                                    <span className="text-2xl font-extrabold text-white">${formatPrecio(totalServicios)}</span>
+                                </div>
                             </div>
 
                             <div className="grid md:grid-cols-2 gap-4">
@@ -513,29 +664,6 @@ export default function OrdenesCleanPage() {
                                         min="0"
                                     />
                                 </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-slate-300">Detalle de Trabajos Realizados</Label>
-                                <Textarea
-                                    value={detalleTrabajos}
-                                    onChange={(e) => setDetalleTrabajos(e.target.value)}
-                                    className="min-h-[100px] bg-slate-700/50 border-slate-600 text-white rounded-xl"
-                                    placeholder="Describe los trabajos realizados en el vehículo..."
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-slate-300">Precio Total ($)</Label>
-                                <Input
-                                    value={precioFinal}
-                                    onChange={(e) => setPrecioFinal(e.target.value)}
-                                    onBlur={() => setPrecioFinal(formatPrecio(parsePrecio(precioFinal)))}
-                                    inputMode="numeric"
-                                    className="bg-slate-700/50 border-slate-600 text-white rounded-xl text-lg font-semibold"
-                                    placeholder="15000"
-                                />
-                                <p className="text-xs text-slate-400">Precio en pesos chilenos</p>
                             </div>
 
                             {/* Métodos de Pago */}

@@ -163,12 +163,18 @@ export default function MecanicoOrdenesPage() {
                                                         <Car className="w-5 h-5 text-[#0066FF]" />
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="text-white font-bold font-mono text-lg">
-                                                            {orden.vehiculos?.patente || orden.patente_vehiculo || 'Sin patente'}
-                                                        </p>
+                                                        {(!orden.patente_vehiculo || orden.patente_vehiculo === 'PIEZA_SUELTA_SYS') ? (
+                                                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 mb-1">PIEZA SUELTA</Badge>
+                                                        ) : (
+                                                            <p className="text-white font-bold font-mono text-lg">
+                                                                {orden.vehiculos?.patente || orden.patente_vehiculo || 'Sin patente'}
+                                                            </p>
+                                                        )}
                                                         <p className="text-sm text-gray-400 truncate">
-                                                            {[orden.vehiculos?.marca, orden.vehiculos?.modelo, orden.vehiculos?.anio]
-                                                                .filter(Boolean).join(' ') || 'Vehículo sin datos'}
+                                                            {(!orden.patente_vehiculo || orden.patente_vehiculo === 'PIEZA_SUELTA_SYS') 
+                                                                ? 'Recepción de Pieza / ECU' 
+                                                                : ([orden.vehiculos?.marca, orden.vehiculos?.modelo, orden.vehiculos?.anio]
+                                                                    .filter(Boolean).join(' ') || 'Vehículo sin datos')}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -208,8 +214,12 @@ export default function MecanicoOrdenesPage() {
                                                     </p>
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div className="bg-[#0a0a0a] rounded-lg p-3">
-                                                            <p className="text-xs text-gray-500 mb-1">Patente</p>
-                                                            <p className="text-white font-bold font-mono">{orden.patente_vehiculo}</p>
+                                                            <p className="text-xs text-gray-500 mb-1">Patente/ID</p>
+                                                            {(!orden.patente_vehiculo || orden.patente_vehiculo === 'PIEZA_SUELTA_SYS') ? (
+                                                                <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 mt-1">PIEZA SUELTA</Badge>
+                                                            ) : (
+                                                                <p className="text-white font-bold font-mono">{orden.patente_vehiculo}</p>
+                                                            )}
                                                         </div>
                                                         <div className="bg-[#0a0a0a] rounded-lg p-3">
                                                             <p className="text-xs text-gray-500 mb-1">Marca / Modelo</p>

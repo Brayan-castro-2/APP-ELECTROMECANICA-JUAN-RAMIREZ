@@ -361,11 +361,12 @@ export default function OrdenesPage() {
         const printContent = filteredOrders.map(order => {
             const vehiculo = getVehiculo(order.patente_vehiculo);
             return {
-                patente: order.patente_vehiculo,
-                vehiculo: vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '-',
+                patente: !order.patente_vehiculo || order.patente_vehiculo === 'PIEZA_SUELTA_SYS' ? 'PIEZA SUELTA' : order.patente_vehiculo,
+                vehiculo: vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : (!order.patente_vehiculo || order.patente_vehiculo === 'PIEZA_SUELTA_SYS' ? 'Pieza / ECU' : '-'),
                 descripcion: order.descripcion_ingreso,
                 creado_por: getPerfilNombre(order.creado_por),
                 asignado_a: order.asignado_a ? getPerfilNombre(order.asignado_a) : '-',
+
                 estado: order.estado,
                 precio: order.precio_total || 0
             };
@@ -626,7 +627,11 @@ export default function OrdenesPage() {
                                             >
                                                 <TableCell className="font-mono text-white">
                                                     <div className="flex items-center gap-1.5">
-                                                        <div className="font-bold text-sm">{order.patente_vehiculo}</div>
+                                                        {!order.patente_vehiculo || order.patente_vehiculo === 'PIEZA_SUELTA_SYS' ? (
+                                                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs px-2 py-0 h-5">PIEZA SUELTA</Badge>
+                                                        ) : (
+                                                            <div className="font-bold text-sm">{order.patente_vehiculo}</div>
+                                                        )}
                                                         {hasDebt(order) && <span className="text-red-400 text-xs">💳</span>}
                                                     </div>
                                                     {order.cliente_nombre && (
@@ -745,8 +750,12 @@ export default function OrdenesPage() {
                                                                     </h3>
                                                                     <div className="space-y-2 text-sm">
                                                                         <div className="flex justify-between">
-                                                                            <span className="text-slate-400">Patente:</span>
-                                                                            <span className="text-white font-mono font-bold">{order.patente_vehiculo}</span>
+                                                                            <span className="text-slate-400">Patente/ID:</span>
+                                                                            {!order.patente_vehiculo || order.patente_vehiculo === 'PIEZA_SUELTA_SYS' ? (
+                                                                                <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">PIEZA SUELTA</Badge>
+                                                                            ) : (
+                                                                                <span className="text-white font-mono font-bold">{order.patente_vehiculo}</span>
+                                                                            )}
                                                                         </div>
                                                                         {vehiculo && (
                                                                             <>
@@ -940,15 +949,19 @@ export default function OrdenesPage() {
                                 <Card key={order.id} className={`bg-slate-700/30 border-slate-600/50 ${hasDebt(order) ? 'border-l-4 border-l-red-500 bg-red-900/10' : ''}`}>
                                     <CardContent className="p-4">
                                         <div className="flex items-start gap-3">
-                                            <div className="w-14 h-10 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <span className="text-white font-mono font-bold text-xs">
-                                                    {order.patente_vehiculo}
-                                                </span>
+                                            <div className="w-auto min-w-[56px] px-2 h-10 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                {!order.patente_vehiculo || order.patente_vehiculo === 'PIEZA_SUELTA_SYS' ? (
+                                                    <span className="text-orange-400 font-bold text-[10px] text-center leading-tight">PIEZA<br/>SUELTA</span>
+                                                ) : (
+                                                    <span className="text-white font-mono font-bold text-xs">
+                                                        {order.patente_vehiculo}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex-1 min-w-0 overflow-hidden">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p className="text-white font-medium truncate text-sm flex-1">
-                                                        {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : order.patente_vehiculo}
+                                                        {(!order.patente_vehiculo || order.patente_vehiculo === 'PIEZA_SUELTA_SYS') ? 'Recepción de Pieza' : (vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : order.patente_vehiculo)}
                                                     </p>
                                                     {hasDebt(order) && <span className="text-red-400 text-xs flex-shrink-0">💳</span>}
                                                 </div>

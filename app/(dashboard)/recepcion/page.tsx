@@ -106,6 +106,8 @@ function RecepcionContent() {
     const [modelo, setModelo] = useState('');
     const [anio, setAnio] = useState('');
     const [motor, setMotor] = useState('');
+    const [tipoIngreso, setTipoIngreso] = useState<'vehiculo' | 'pieza'>('vehiculo');
+    const [descripcionPieza, setDescripcionPieza] = useState('');
 
     const [kmActual, setKmActual] = useState('');
     const [kmNuevo, setKmNuevo] = useState('');
@@ -115,6 +117,22 @@ function RecepcionContent() {
     const [vehiculoLocked, setVehiculoLocked] = useState(false);
     const [estadoBusqueda, setEstadoBusqueda] = useState('');
     const [isBuscando, setIsBuscando] = useState(false);
+
+    // 3D Flip Card state
+    const [cardHeight, setCardHeight] = useState<number | 'auto'>('auto');
+    const frontRef = useRef<HTMLDivElement>(null);
+    const backRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (tipoIngreso === 'vehiculo' && frontRef.current) {
+                setCardHeight(frontRef.current.offsetHeight);
+            } else if (tipoIngreso === 'pieza' && backRef.current) {
+                setCardHeight(backRef.current.offsetHeight);
+            }
+        }, 50);
+        return () => clearTimeout(timer);
+    }, [tipoIngreso, estadoBusqueda]);
 
     const [clienteNombre, setClienteNombre] = useState('');
     const [clienteWhatsapp, setClienteWhatsapp] = useState('');
@@ -488,13 +506,20 @@ function RecepcionContent() {
             alert('Sesión no encontrada. Inicia sesión nuevamente.');
             return;
         }
-        if (!p) {
-            alert('Ingresa una patente.');
-            return;
-        }
-        if (!marca || !modelo || !anio) {
-            alert('Completa los datos del vehículo (Marca, Modelo, Año).');
-            return;
+        if (tipoIngreso === 'vehiculo') {
+            if (!p) {
+                alert('Ingresa una patente.');
+                return;
+            }
+            if (!marca || !modelo || !anio) {
+                alert('Completa los datos del vehículo (Marca, Modelo, Año).');
+                return;
+            }
+        } else {
+            if (!descripcionPieza.trim()) {
+                alert('Ingresa la descripción de la pieza.');
+                return;
+            }
         }
 
         const serviciosForOrder = servicios
@@ -531,40 +556,58 @@ function RecepcionContent() {
             .map((s) => `- ${s.descripcion || 'Servicio'}: $${moneyCL(s.precio)}`)
             .join('\n');
 
-        // Validar campos obligatorios del vehículo
-        if (!marca || marca.trim() === '' || marca === 'Por definir') {
-            alert('Por favor ingresa la Marca del vehículo.');
-            return;
-        }
-        if (!modelo || modelo.trim() === '' || modelo === 'Por definir') {
-            alert('Por favor ingresa el Modelo del vehículo.');
-            return;
-        }
-        if (!anio || anio.trim() === '') {
-            alert('Por favor ingresa el Año del vehículo.');
-            return;
+        if (tipoIngreso === 'vehiculo') {
+            if (!marca || marca.trim() === '' || marca === 'Por definir') {
+                alert('Por favor ingresa la Marca del vehículo.');
+                return;
+            }
+            if (!modelo || modelo.trim() === '' || modelo === 'Por definir') {
+                alert('Por favor ingresa el Modelo del vehículo.');
+                return;
+            }
+            if (!anio || anio.trim() === '') {
+                alert('Por favor ingresa el Año del vehículo.');
+                return;
+            }
         }
 
         setIsSubmitting(true);
         try {
-            // SIEMPRE guardar/actualizar el vehículo con los datos del formulario
-            console.log('🚗 Guardando vehículo con datos:', { patente: p, marca, modelo, anio, motor });
-            const vehiculoGuardado = await crearVehiculo({
-                patente: p,
-                marca: marca.trim(),
-                modelo: modelo.trim(),
-                anio: anio.trim(),
-                motor: motor?.trim() || '',
-                color: '-',
-            });
+            let finalPatente = p;
+            let finalDetallesVehiculo = detallesVehiculo.trim();
 
-            if (!vehiculoGuardado) {
-                alert('Error al guardar el vehículo. Intenta de nuevo.');
-                setIsSubmitting(false);
-                return;
+            if (tipoIngreso === 'pieza') {
+                finalPatente = 'PIEZA_SUELTA_SYS';
+                finalDetallesVehiculo = `PIEZA: ${descripcionPieza.trim()}` + (detallesVehiculo.trim() ? `\n${detallesVehiculo.trim()}` : '');
+                
+                // Ensure the dummy vehicle exists
+                await crearVehiculo({
+                    patente: finalPatente,
+                    marca: 'PIEZA',
+                    modelo: 'SUELTA',
+                    anio: '0000',
+                    motor: '',
+                    color: '-',
+                });
+            } else {
+                // SIEMPRE guardar/actualizar el vehículo con los datos del formulario
+                console.log('🚗 Guardando vehículo con datos:', { patente: p, marca, modelo, anio, motor });
+                const vehiculoGuardado = await crearVehiculo({
+                    patente: p,
+                    marca: marca.trim(),
+                    modelo: modelo.trim(),
+                    anio: anio.trim(),
+                    motor: motor?.trim() || '',
+                    color: '-',
+                });
+
+                if (!vehiculoGuardado) {
+                    alert('Error al guardar el vehículo. Intenta de nuevo.');
+                    setIsSubmitting(false);
+                    return;
+                }
+                console.log('✅ Vehículo guardado correctamente:', vehiculoGuardado);
             }
-
-            console.log('✅ Vehículo guardado correctamente:', vehiculoGuardado);
 
             // Construir número completo de WhatsApp con prefijo +569
             const whatsappCompleto = clienteWhatsapp ? `+569${clienteWhatsapp}` : undefined;
@@ -576,7 +619,7 @@ function RecepcionContent() {
             console.log('💾 Guardando KM - Ingreso:', kmIngresoValue, 'Salida:', kmSalidaValue);
 
             const orden = await crearOrden({
-                patente_vehiculo: p,
+                patente_vehiculo: finalPatente,
                 descripcion_ingreso: descripcionIngreso,
                 creado_por: user.id,
                 estado: 'pendiente',
@@ -585,7 +628,7 @@ function RecepcionContent() {
                 cliente_telefono: whatsappCompleto,
                 precio_total: total || undefined,
                 fotos: fotos.length ? fotos : undefined,
-                detalles_vehiculo: detallesVehiculo.trim() || undefined,
+                detalles_vehiculo: finalDetallesVehiculo || undefined,
                 kilometraje: kmIngresoValue,
                 kilometraje_salida: kmSalidaValue,
             });
@@ -639,6 +682,7 @@ function RecepcionContent() {
         setModelo('');
         setAnio('');
         setMotor('');
+        setDescripcionPieza('');
         setKmActual('');
         setKmNuevo('');
         setKmEnabled(false);
@@ -678,76 +722,131 @@ function RecepcionContent() {
                 <div className="mt-2 text-xs text-slate-400">Se completa automáticamente con el usuario actual (si existe).</div>
             </div>
 
-            <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5">
-                <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">VEHÍCULO</div>
+            <div className="mb-6 flex space-x-2 rounded-2xl bg-slate-800/60 p-1.5 shadow-inner border border-slate-700/50">
+                <button
+                    type="button"
+                    onClick={() => setTipoIngreso('vehiculo')}
+                    className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all duration-300 ${
+                        tipoIngreso === 'vehiculo'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                    }`}
+                >
+                    🚗 Ingreso de Vehículo
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setTipoIngreso('pieza')}
+                    className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all duration-300 ${
+                        tipoIngreso === 'pieza'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                    }`}
+                >
+                    🔌 Recepción de Pieza / ECU
+                </button>
+            </div>
 
-                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-                    <div>
-                        <label className="text-sm font-semibold text-slate-200">Patente</label>
-                        <input
-                            value={patente}
-                            onChange={(e) => setPatente(normalizePatente(e.target.value))}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    buscarPatente();
-                                }
-                            }}
-                            placeholder="AA-BB-11"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 md:py-4 text-center font-mono text-xl md:text-2xl font-bold uppercase tracking-widest text-white"
-                            maxLength={6}
-                        />
-                        <div className="mt-2 text-xs text-slate-400">Ejemplos: PROFE1, BBBB10, TEST01</div>
+            <div className="relative w-full perspective-[1000px] transition-[height] duration-500 ease-in-out" style={{ height: cardHeight === 'auto' ? 'auto' : `${cardHeight}px` }}>
+                <div
+                    className="relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d]"
+                    style={{ transform: tipoIngreso === 'pieza' ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                >
+                    {/* Cara Frontal: Vehículo */}
+                    <div ref={frontRef} className="absolute top-0 left-0 w-full [backface-visibility:hidden]">
+                        <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5 shadow-xl backdrop-blur-sm">
+                            <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">
+                                VEHÍCULO
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-200">Patente</label>
+                                    <input
+                                        value={patente}
+                                        onChange={(e) => setPatente(normalizePatente(e.target.value))}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                buscarPatente();
+                                            }
+                                        }}
+                                        placeholder="AA-BB-11"
+                                        className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 md:py-4 text-center font-mono text-xl md:text-2xl font-bold uppercase tracking-widest text-white"
+                                        maxLength={6}
+                                    />
+                                    <div className="mt-2 text-xs text-slate-400">Ejemplos: PROFE1, BBBB10, TEST01</div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={buscarPatente}
+                                    disabled={isBuscando}
+                                    className="h-[50px] md:h-[54px] rounded-xl bg-blue-600 px-6 md:px-8 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                    {isBuscando ? '🔄 Buscando...' : '🔍 Buscar'}
+                                </button>
+                            </div>
+
+                            {estadoBusqueda ? <div className="mt-3 text-sm text-slate-300">{estadoBusqueda}</div> : null}
+
+                            <div className="mt-5 grid gap-4 md:grid-cols-2">
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-200">Marca</label>
+                                    <input
+                                        value={marca}
+                                        onChange={(e) => setMarca(e.target.value)}
+                                        placeholder="Ej: Toyota, Chevrolet"
+                                        className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-200">Modelo</label>
+                                    <input
+                                        value={modelo}
+                                        onChange={(e) => setModelo(e.target.value)}
+                                        placeholder="Ej: Corolla, Sail"
+                                        className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-200">Año</label>
+                                    <input
+                                        value={anio}
+                                        onChange={(e) => setAnio(e.target.value)}
+                                        placeholder="Ej: 2020"
+                                        className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-200">Motor</label>
+                                    <input
+                                        value={motor}
+                                        onChange={(e) => setMotor(e.target.value)}
+                                        placeholder="Ej: 1.4, 1.6 Twin Cam"
+                                        className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={buscarPatente}
-                        disabled={isBuscando}
-                        className="h-[50px] md:h-[54px] rounded-xl bg-blue-600 px-6 md:px-8 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {isBuscando ? '🔄 Buscando...' : '🔍 Buscar'}
-                    </button>
-                </div>
-
-                {estadoBusqueda ? <div className="mt-3 text-sm text-slate-300">{estadoBusqueda}</div> : null}
-
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label className="text-sm font-semibold text-slate-200">Marca</label>
-                        <input
-                            value={marca}
-                            onChange={(e) => setMarca(e.target.value)}
-                            placeholder="Ej: Toyota, Chevrolet"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-sm font-semibold text-slate-200">Modelo</label>
-                        <input
-                            value={modelo}
-                            onChange={(e) => setModelo(e.target.value)}
-                            placeholder="Ej: Corolla, Sail"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-sm font-semibold text-slate-200">Año</label>
-                        <input
-                            value={anio}
-                            onChange={(e) => setAnio(e.target.value)}
-                            placeholder="Ej: 2020"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-sm font-semibold text-slate-200">Motor</label>
-                        <input
-                            value={motor}
-                            onChange={(e) => setMotor(e.target.value)}
-                            placeholder="Ej: 1.4, 1.6 Twin Cam"
-                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
-                        />
+                    {/* Cara Trasera: Pieza / ECU */}
+                    <div ref={backRef} className="absolute top-0 left-0 w-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                        <div className="rounded-2xl border border-slate-700/50 bg-slate-900/40 p-5 shadow-xl backdrop-blur-sm">
+                            <div className="mb-4 text-xs font-semibold tracking-widest text-slate-200">
+                                PIEZA SUELTA
+                            </div>
+                            <div>
+                                <label className="text-sm font-semibold text-slate-200">Descripción de la Pieza</label>
+                                <input
+                                    value={descripcionPieza}
+                                    onChange={(e) => setDescripcionPieza(e.target.value)}
+                                    placeholder="Ej: ECU Bosch MED17, Módulo ABS, Alternador..."
+                                    className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-white placeholder:text-gray-500"
+                                />
+                                <div className="mt-2 text-xs text-slate-400">Describe la pieza o módulo recibido. La patente se asignará automáticamente como PIEZA SUELTA.</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1051,7 +1150,7 @@ function RecepcionContent() {
                     />
                 )
             }
-        </div >
+        </div>
     );
 }
 
